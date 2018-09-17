@@ -1,0 +1,9 @@
+# exclude
+
+data/cam*/videos/*
+__pycache__
+.ipynb_checkpoints
+
+# include
+
+!data/*.md
