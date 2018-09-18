@@ -1,15 +1,17 @@
-import time
-import cv2
-from kafka import SimpleProducer, KafkaClient
 import os
-import boto3
 import sys
+import time
 from io import BytesIO
+
+import cv2
+
+import boto3
+from kafka import KafkaClient, SimpleProducer
 
 aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
 aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
-resource = boto3.resource('s3') # high-level object-oriented API
-my_bucket = resource.Bucket('camera-data-eye') # s3 bucket name. 
+resource = boto3.resource('s3')  # high-level object-oriented API
+my_bucket = resource.Bucket('camera-data-eye')  # s3 bucket name.
 
 # get object meta data in the directory
 files = list(my_bucket.objects.filter(Prefix='cam1/videos/'))
@@ -32,13 +34,14 @@ producer = SimpleProducer(kafka)
 # Assign a topic
 topic = 'frames'
 
-video_path = "/home/ubuntu/eye_of_sauron/data/cam1/videos/cam1_2_fps.mp4" 
+video_path = "/home/ubuntu/eye_of_sauron/data/cam1/videos/cam1_2_fps.mp4"
 
 # serving from s3 bucket via cloudFront: url to the object
 cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
 cfront_url = cfront_endpoint + "cam0/videos/cam0_5_fps.mp4"
 
 print(os.listdir("/home/ubuntu/eye_of_sauron/data/cam1/videos/"))
+
 
 def video_emitter(video):
     # Open the video
@@ -57,15 +60,16 @@ def video_emitter(video):
         ret, jpeg = cv2.imencode('.png', image)
         # Convert the image to bytes and send to kafka
         producer.send_messages(topic, jpeg.tobytes())
-        # To reduce CPU usage create sleep time of 0.2sec  
+        # To reduce CPU usage create sleep time of 0.2sec
         time.sleep(0.1)
         i += 1
-    
+
     # clear the capture
     video.release()
     print('Done emitting...')
 
+
 if __name__ == '__main__':
-    
+
     # video_emitter(video_path)
     video_emitter(cfront_url)
