@@ -35,7 +35,8 @@ topic = 'frames'
 video_path = "/home/ubuntu/eye_of_sauron/data/cam1/videos/cam1_2_fps.mp4" 
 
 # serving from s3 bucket via cloudFront: url to the object
-cfront_url = "http://dqjqvfw96ipmn.cloudfront.net/cam0_2_fps.mp4"
+cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
+cfront_url = cfront_endpoint + "cam0/videos/cam0_5_fps.mp4"
 
 print(os.listdir("/home/ubuntu/eye_of_sauron/data/cam1/videos/"))
 
