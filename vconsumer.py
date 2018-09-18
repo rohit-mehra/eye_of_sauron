@@ -1,8 +1,9 @@
 from flask import Flask, Response
 from kafka import KafkaConsumer
 
+topic = "frames"
 #connect to Kafka server and pass the topic we want to consume
-consumer = KafkaConsumer('frames', group_id='view' bootstrap_servers=['0.0.0.0:9092'])
+consumer = KafkaConsumer(topic, group_id='view', bootstrap_servers=['0.0.0.0:9092'])
 
 #Continuously listen to the connection and print messages as recieved
 app = Flask(__name__)
