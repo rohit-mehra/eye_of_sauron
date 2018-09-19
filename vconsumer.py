@@ -39,7 +39,7 @@ def index():
 
 def kafkastream():
     for msg in consumer:
-        frame_obj = json.loads(msg.value) # {"timestamp":time.time(), "frame":serialized_image, "camera":CAMERA_NUM, "display":jpeg.tobytes()}
+        frame_obj = json.loads(msg.value.decode('latin1')) # {"timestamp":time.time(), "frame":serialized_image, "camera":CAMERA_NUM, "display":jpeg.tobytes()}
         
         frame = np_from_json(frame_obj)
         timestamp = int(frame_obj['timestamp'])

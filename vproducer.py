@@ -11,7 +11,7 @@ FPS = 5
 GRAY = True
 
 #  connect to Kafka
-producer = KafkaProducer(bootstrap_servers=['localhost:9092'], value_serializer=lambda hashmap: json.dumps(hashmap))
+producer = KafkaProducer(bootstrap_servers=['localhost:9092'] , value_serializer=lambda hashmap: json.dumps(hashmap).encode('latin1'))
 
 # Assign a topic
 topic = 'frames'
@@ -56,7 +56,8 @@ def video_emitter(video):
         message = {"timestamp":time.time(), "camera":CAMERA_NUM}
         
         message.update(frame_dict)
-        
+#         message = json.dumps(message)
+#         print(type(message))
         producer.send(topic, message)
         
         if i == 1:
