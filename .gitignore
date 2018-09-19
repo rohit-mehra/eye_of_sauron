@@ -3,7 +3,7 @@
 data/cam*/videos/*
 __pycache__
 .ipynb_checkpoints
-
+*.npy
 # include
 
 !data/*.md

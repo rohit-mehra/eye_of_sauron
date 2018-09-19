@@ -8,6 +8,7 @@ from flask import Flask, Response
 from kafka import KafkaConsumer
 from utils import np_from_json
 import json
+import time
 
 
 model_name = "mnist_model.h5"
@@ -42,12 +43,25 @@ def kafkastream():
         frame_obj = json.loads(msg.value.decode('latin1')) # {"timestamp":time.time(), "frame":serialized_image, "camera":CAMERA_NUM, "display":jpeg.tobytes()}
         
         frame = np_from_json(frame_obj)
+        
+        # MNIST SPECIFIC
+        frame = frame.reshape(28, 28, 1)
+        
+        # batch
+        model_in = np.expand_dims(frame, axis=0)
+        
+        # predict
+        model_out = np.argmax(np.squeeze(model.predict(model_in)))
+        
         timestamp = int(frame_obj['timestamp'])
         camera = int(frame_obj['camera'])
 
         # convert the image png --> display
         ret, png = cv2.imencode('.png', frame)
-        print(frame.shape, timestamp, camera)
+        print("{}, timestamp: {}, camera_num: {}, latency: {}, y_hat: {}".format(frame.shape, 
+                                                                             timestamp,
+                                                                             camera, 
+                                                                             time.time() - timestamp), model_out)
         
         yield (b'--frame\r\n'
                b'Content-Type: image/png\r\n\r\n' + png.tobytes() + b'\r\n\r\n')
