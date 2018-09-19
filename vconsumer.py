@@ -1,16 +1,19 @@
 import os
 import sys
-
+import cv2
 from keras.models import load_model
 import numpy as np
 import wget
 from flask import Flask, Response
 from kafka import KafkaConsumer
+from utils import np_from_json
+import json
+
 
 model_name = "mnist_model.h5"
 topic = "frames"
 
-# model from s3--> cloudfront --> dowmload
+# get model from s3--> cloudfront --> dowmload
 cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
 cfront_url = cfront_endpoint + model_name
 
@@ -36,10 +39,15 @@ def index():
 
 def kafkastream():
     for msg in consumer:
-        fr = np.frombuffer(msg.value, dtype=np.uint8)
-        print(fr.shape)
+        frame_obj = json.loads(msg.value) # {"timestamp":time.time(), "frame":serialized_image, "camera":CAMERA_NUM, "display":jpeg.tobytes()}
+        
+        frame = np_from_json(frame_obj['frame'])
+        timestamp = int(frame_obj['timestamp'])
+        camera = int(frame_obj['camera'])
+        
+        print(frame.shape, timestamp, camera)
         yield (b'--frame\r\n'
-               b'Content-Type: image/png\r\n\r\n' + msg.value + b'\r\n\r\n')
+               b'Content-Type: image/png\r\n\r\n' + frame_obj['display'] + b'\r\n\r\n')
 
 
 if __name__ == '__main__':
