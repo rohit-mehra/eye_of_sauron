@@ -44,10 +44,13 @@ def kafkastream():
         frame = np_from_json(frame_obj)
         timestamp = int(frame_obj['timestamp'])
         camera = int(frame_obj['camera'])
-        
+
+        # convert the image png --> display
+        ret, png = cv2.imencode('.png', image)
         print(frame.shape, timestamp, camera)
+        
         yield (b'--frame\r\n'
-               b'Content-Type: image/png\r\n\r\n' + frame_obj['display'] + b'\r\n\r\n')
+               b'Content-Type: image/png\r\n\r\n' + png.tobytes() + b'\r\n\r\n')
 
 
 if __name__ == '__main__':

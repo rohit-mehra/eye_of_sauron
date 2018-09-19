@@ -43,9 +43,6 @@ def video_emitter(video):
         if not success:
             print("BREAK AT FRAME: {}".format(i))
             break
-
-        # convert the image png --> display
-        ret, jpeg = cv2.imencode('.png', image)
         
         if GRAY:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # (28, 28)
@@ -56,11 +53,14 @@ def video_emitter(video):
                                                         #  'shape': obj.shape}
         
         # Convert the image to bytes, create json message and send to kafka
-        message = {"timestamp":time.time(), "camera":CAMERA_NUM, "display":jpeg.tobytes()}
+        message = {"timestamp":time.time(), "camera":CAMERA_NUM}
         
         message.update(frame_dict)
         
         producer.send(topic, message)
+        
+        if i == 1:
+            print(message.keys())
         
         # To reduce CPU usage create sleep time of 0.1sec  
         time.sleep(0.1)
