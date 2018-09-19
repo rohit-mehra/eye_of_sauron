@@ -1,3 +1,4 @@
+<<<<<<< 6d51bda2fbc8e06d03522226b27f6eeac416cb37
 import os
 import sys
 import time
@@ -26,21 +27,30 @@ print(files)
 #vid_stream = BytesIO(vid_obj.read())
 
 # sys.exit(0)
+=======
+import time
+import cv2
+from kafka import KafkaProducer
+import os
+>>>>>>> frame bytes to numpy array in vconsumer.py
 
 #  connect to Kafka
-kafka = KafkaClient('localhost:9092')
-producer = SimpleProducer(kafka)
+producer = KafkaProducer(bootstrap_servers=['localhost:9092'])
 
 # Assign a topic
 topic = 'frames'
 
+<<<<<<< 6d51bda2fbc8e06d03522226b27f6eeac416cb37
 video_path = "/home/ubuntu/eye_of_sauron/data/cam1/videos/cam1_2_fps.mp4"
+=======
+# video_path = "/home/ubuntu/eye_of_sauron/data/cam1/videos/cam1_2_fps.mp4" 
+>>>>>>> frame bytes to numpy array in vconsumer.py
 
 # serving from s3 bucket via cloudFront: url to the object
 cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
 cfront_url = cfront_endpoint + "cam0/videos/cam0_5_fps.mp4"
 
-print(os.listdir("/home/ubuntu/eye_of_sauron/data/cam1/videos/"))
+# print(os.listdir("/home/ubuntu/eye_of_sauron/data/cam1/videos/"))
 
 
 def video_emitter(video):
@@ -59,14 +69,19 @@ def video_emitter(video):
         # convert the image png
         ret, jpeg = cv2.imencode('.png', image)
         # Convert the image to bytes and send to kafka
+<<<<<<< 6d51bda2fbc8e06d03522226b27f6eeac416cb37
         producer.send_messages(topic, jpeg.tobytes())
         # To reduce CPU usage create sleep time of 0.2sec
+=======
+        producer.send(topic, jpeg.tobytes())
+        # To reduce CPU usage create sleep time of 0.1sec  
+>>>>>>> frame bytes to numpy array in vconsumer.py
         time.sleep(0.1)
         i += 1
 
     # clear the capture
     video.release()
-    print('Done emitting...')
+    print('Done Emitting...')
 
 
 if __name__ == '__main__':
