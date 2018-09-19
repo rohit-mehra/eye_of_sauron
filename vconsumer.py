@@ -1,23 +1,11 @@
 import os
 import sys
-<<<<<<< 6d51bda2fbc8e06d03522226b27f6eeac416cb37
-from io import BytesIO
-=======
+
 from keras.models import load_model
 import numpy as np
 import wget
 from flask import Flask, Response
 from kafka import KafkaConsumer
->>>>>>> frame bytes to numpy array in vconsumer.py
-
-model_name = "mnist_model.h5"
-topic = "frames"
-
-<<<<<<< 6d51bda2fbc8e06d03522226b27f6eeac416cb37
-import boto3
-import wget
-from flask import Flask, Response
-from kafka import KafkaConsumer
 
 model_name = "mnist_model.h5"
 topic = "frames"
@@ -31,19 +19,7 @@ if not os.path.isfile(model_name):
 
 model = load_model(model_name)
 print("**Model Loaded from: {}".format(cfront_url))
-print(model.summary())
-=======
-# model from s3--> cloudfront --> dowmload
-cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
-cfront_url = cfront_endpoint + model_name
 
-if not os.path.isfile(model_name):
-    wget.download(cfront_url, './mnist_model.h5')
-
-model = load_model(model_name)
-print("**Model Loaded from: {}".format(cfront_url))
-
->>>>>>> frame bytes to numpy array in vconsumer.py
 # connect to Kafka server and pass the topic we want to consume
 consumer = KafkaConsumer(topic, group_id='view', bootstrap_servers=['0.0.0.0:9092'])
 
