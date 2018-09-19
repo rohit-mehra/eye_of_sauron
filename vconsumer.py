@@ -11,7 +11,7 @@ import json
 
 
 model_name = "mnist_model.h5"
-topic = "frames"
+topic = "frame_objs"
 
 # get model from s3--> cloudfront --> dowmload
 cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
@@ -46,7 +46,7 @@ def kafkastream():
         camera = int(frame_obj['camera'])
 
         # convert the image png --> display
-        ret, png = cv2.imencode('.png', image)
+        ret, png = cv2.imencode('.png', frame)
         print(frame.shape, timestamp, camera)
         
         yield (b'--frame\r\n'

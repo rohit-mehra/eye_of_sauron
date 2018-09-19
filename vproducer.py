@@ -14,7 +14,7 @@ GRAY = True
 producer = KafkaProducer(bootstrap_servers=['localhost:9092'] , value_serializer=lambda hashmap: json.dumps(hashmap).encode('latin1'))
 
 # Assign a topic
-topic = 'frames'
+topic = 'frame_objs'
 
 # serving from s3 bucket via cloudFront: url to the object
 cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
@@ -57,7 +57,7 @@ def video_emitter(video):
         
         message.update(frame_dict)
 #         message = json.dumps(message)
-#         print(type(message))
+#         print(message)
         producer.send(topic, message)
         
         if i == 1:
