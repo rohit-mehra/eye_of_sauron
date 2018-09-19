@@ -43,18 +43,23 @@ def video_emitter(video):
         if not success:
             print("BREAK AT FRAME: {}".format(i))
             break
-            
-        if GRAY:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # (28, 28)
-        
-        # serialize numpy array --> model
-        serialized_image = np_to_json(gray.astype(np.uint8))
 
         # convert the image png --> display
         ret, jpeg = cv2.imencode('.png', image)
         
+        if GRAY:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # (28, 28)
+        
+        # serialize numpy array --> model
+        frame_dict = np_to_json(image.astype(np.uint8)) # {'frame': base64.b64encode(obj.tostring()).decode("utf-8"),
+                                                        #  'dtype': obj.dtype.str,
+                                                        #  'shape': obj.shape}
+        
         # Convert the image to bytes, create json message and send to kafka
-        message = {"timestamp":time.time(), "frame":serialized_image, "camera":CAMERA_NUM, "display":jpeg.tobytes()}
+        message = {"timestamp":time.time(), "camera":CAMERA_NUM, "display":jpeg.tobytes()}
+        
+        message.update(frame_dict)
+        
         producer.send(topic, message)
         
         # To reduce CPU usage create sleep time of 0.1sec  
