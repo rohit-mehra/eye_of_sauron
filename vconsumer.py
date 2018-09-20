@@ -1,15 +1,14 @@
 import os
-import sys
 import cv2
 from keras.models import load_model
 import tensorflow as tf
 import numpy as np
-import wget
 from flask import Flask, Response, render_template
 from kafka import KafkaConsumer
 from utils import np_from_json
 import json
 import time
+import wget
 
 
 model_name = "mnist_model.h5"
@@ -40,6 +39,7 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/cam')
 def cam():
@@ -77,6 +77,7 @@ def get_result(frame_obj):
               "latency": time.time() - timestamp}
     
     return result, png
+
 
 def kafkastream():
     for msg in consumer:
