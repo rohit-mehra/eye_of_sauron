@@ -33,19 +33,21 @@ def transform(frame, frame_num, camera=0, gray=False):
     # serialize numpy array --> model
     # {'frame': string(base64encodedarray), 'dtype': obj.dtype.str, 'shape': obj.shape}
     frame_dict = np_to_json(frame.astype(np.uint8))
+    
     # Convert the image to bytes, create json message and send to kafka
     message = {"timestamp": time.time(), "camera": camera, "frame_num": frame_num}
+    
     # add frame and metadata related to frame
     message.update(frame_dict)
     return message
 
 
 def video_emitter(video):
-
+    """Reads frame by frame, attaches meta data, publishes"""
     # Open the video
     print('Monitoring Stream from: ', video)
     video = cv2.VideoCapture(video)
-    print('Emitting.....')
+    print('Publishing.....')
 
     # monitor frame number
     i = 0
@@ -73,7 +75,7 @@ def video_emitter(video):
 
     # clear the capture
     video.release()
-    print('Done Emitting...')
+    print('Done Publishing...')
 
 
 if __name__ == '__main__':

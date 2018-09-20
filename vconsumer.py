@@ -14,8 +14,11 @@ import time
 
 model_name = "mnist_model.h5"
 topic = "frame_objs"
+
 # connect to Kafka server and pass the topic we want to consume
-consumer = KafkaConsumer(topic, group_id='view', bootstrap_servers=['0.0.0.0:9092'])
+consumer = KafkaConsumer(topic, group_id='view', 
+                         bootstrap_servers=['0.0.0.0:9092'],
+                         value_deserializer= lambda value: json.loads(value.decode()))
 
 # get model from s3--> cloudfront --> dowmload
 cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
@@ -47,6 +50,8 @@ def cam():
 
 def get_result(frame_obj):
     
+    """Processes value produced by producer, returns prediction with png image."""
+    
     frame = np_from_json(frame_obj)
 
     # MNIST SPECIFIC
@@ -75,10 +80,7 @@ def get_result(frame_obj):
 
 def kafkastream():
     for msg in consumer:
-        # {"timestamp":time.time(), "frame":serialized_image, "camera":CAMERA_NUM, 
-        # "display":jpeg.tobytes(), "frame_num": frame in current video}
-        frame_obj = json.loads(msg.value.decode()) 
-        result, png = get_result(frame_obj)
+        result, png = get_result(msg.value)
         print("timestamp: {}, frame_num: {},camera_num: {}, latency: {}, y_hat: {}".format(result['timestamp'],
                                                                                            result['frame_num'],
                                                                                            result['camera'], 
