@@ -4,7 +4,8 @@
   </head>
   <body>
     <h1>Video Streaming Demonstration</h1>
-        <img src="{{ url_for("cam")}}">
-        <img src="{{ url_for("came")}}">
+    {% for number in posts %}
+        <img src="{{ url_for("cam", number=number)}}">
+    {% endfor %}
   </body>
 </html>

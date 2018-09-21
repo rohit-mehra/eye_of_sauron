@@ -7,8 +7,8 @@ from multiprocessing import Pool
 from kafka import KafkaProducer
 from utils import np_to_json
 
-TOTAL_CAMERAS = 2
-FPS = 10
+TOTAL_CAMERAS = 3
+FPS = 2
 
 GRAY = True
 C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"

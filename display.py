@@ -7,19 +7,13 @@ import json
 
 # TODO: add three prediction topics, three retreival
 
-TOTAL_CAMERAS = 2
+TOTAL_CAMERAS = 3
 prediction_topic_prefix = 'predicted_objs'
 prediction_topics = ["{}_{}".format(prediction_topic_prefix, i) for i in range(TOTAL_CAMERAS)]
+
 prediction_consumers = [KafkaConsumer(topic, group_id='view',
                                       bootstrap_servers=['0.0.0.0:9092'],
                                       value_deserializer=lambda value: json.loads(value.decode())) for topic in prediction_topics]
-
-# prediction_topic = 'predicted_objs'
-#
-# # connect to Kafka server and pass the topic we want to consume
-# prediction_consumer = KafkaConsumer(prediction_topic, group_id='view',
-#                                     bootstrap_servers=['0.0.0.0:9092'],
-#                                     value_deserializer=lambda value: json.loads(value.decode()))
 
 
 def get_prediction(frame_obj):
@@ -46,26 +40,20 @@ def get_frame(consumer):
 
 
 # Continuously listen to the connection and print messages as received
+
 app = Flask(__name__)
 
 
-@app.route('/cam')
-def cam():
+@app.route('/cam/<number>')
+def cam(number):
     # return a multipart response
-    return Response(get_frame(prediction_consumers[0]),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
-
-
-@app.route('/came')
-def came():
-    # return a multipart response
-    return Response(get_frame(prediction_consumers[1]),
+    return Response(get_frame(prediction_consumers[int(number)]),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', posts=list(range(TOTAL_CAMERAS)))
 
 
 if __name__ == '__main__':
