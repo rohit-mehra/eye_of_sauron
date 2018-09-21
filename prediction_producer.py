@@ -8,6 +8,8 @@ import json
 import time
 import wget
 
+# Gets new task from a pool of frame objects
+# TODO: publish to camera specific topic, DONE
 
 # MODEL
 MODEL_NAME = "mnist_model.h5"
@@ -25,9 +27,11 @@ print("**Model Loaded from: {}".format(cfront_url))
 
 # KAFKA TODO: Check kafka compression, multiple consumer, threads safe producer
 
-frame_topic = "frame_objs"
-# COnnect to kafka, Consume frame obj bytes deserialize to json
-frame_consumer = KafkaConsumer(frame_topic, group_id='predict',
+# COMMON TOPIC
+FRAME_TOPIC = 'frame_objects'
+
+# Connect to kafka, Consume frame obj bytes deserialize to json
+frame_consumer = KafkaConsumer(FRAME_TOPIC, group_id='predict',
                                bootstrap_servers=['0.0.0.0:9092'],
                                value_deserializer=lambda value: json.loads(value.decode()))
 
@@ -35,7 +39,7 @@ frame_consumer = KafkaConsumer(frame_topic, group_id='predict',
 prediction_producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
                                     value_serializer=lambda hashmap: json.dumps(hashmap).encode())
 
-prediction_topic = 'predicted_objs'
+prediction_topic_prefix = 'predicted_objs'
 
 
 def get_prediction_object(frame_obj):
@@ -57,6 +61,7 @@ def get_prediction_object(frame_obj):
               "predict_time": str(time.time()),
               "latency": str(time.time() - int(frame_obj['timestamp']))}
 
+    print(result)
     result.update(frame_obj)
     return result
 
@@ -67,14 +72,26 @@ def process_stream(msg_stream):
             try:
                 msg = next(msg_stream)
                 result = get_prediction_object(msg.value)
+                print("timestamp: {}, frame_num: {},camera_num: {}, latency: {}, y_hat: {}".format(result['timestamp'],
+                                                                                                   result['frame_num'],
+                                                                                                   result['camera'],
+                                                                                                   result['latency'],
+                                                                                                   result['prediction']
+                                                                                                   ))
+                # camera specific topic
+                prediction_topic = "{}_{}".format(prediction_topic_prefix, result['camera'])
                 prediction_producer.send(prediction_topic, value=result)
-            except StopIteration:
+
+            except StopIteration as e:
+                print(e)
                 continue
 
-    except KeyboardInterrupt:
+    except KeyboardInterrupt as e:
+        print(e)
         pass
 
     finally:
+        print("Closing Stream")
         msg_stream.close()
 
 

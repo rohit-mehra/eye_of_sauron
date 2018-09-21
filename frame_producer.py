@@ -1,26 +1,27 @@
 import json
 import time
-
+import re
 import cv2
 import numpy as np
-
+from multiprocessing import Pool
 from kafka import KafkaProducer
 from utils import np_to_json
 
-CAMERA_NUM = 0
+TOTAL_CAMERAS = 2
 FPS = 10
+
 GRAY = True
+C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 
-#  connect to Kafka
-frame_producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
-                               value_serializer=lambda hashmap: json.dumps(hashmap).encode())
 
-# Assign a topic
-frame_topic = 'frame_objs'
+# TOPIC USED TO PUBLISH ALL FRAMES TO
+FRAME_TOPIC = 'frame_objects'
 
-# serving from s3 bucket via cloudFront: url to the object
-cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
-cfront_url = cfront_endpoint + "cam{}/videos/cam{}_{}_fps.mp4".format(CAMERA_NUM, CAMERA_NUM, FPS)
+
+def get_video_feed_url(camera_num=0, fps=10):
+    """Gets the camera IP, where video is being streamed"""
+    # serving from s3 bucket via cloudFront: url to the object
+    return C_FRONT_ENDPOINT + "cam{}/videos/cam{}_{}_fps.mp4".format(camera_num, camera_num, fps)
 
 
 def transform(frame, frame_num, camera=0, gray=False):
@@ -41,11 +42,15 @@ def transform(frame, frame_num, camera=0, gray=False):
     return message
 
 
-def video_emitter(video):
+def video_emitter(video_url):
+    # Connect to Kafka, new producer for each thread!!!! important
+    FRAME_PRODUCER = KafkaProducer(bootstrap_servers=['localhost:9092'],
+                                   value_serializer=lambda hash_map: json.dumps(hash_map).encode())
+
     """Reads frame by frame, attaches meta data, publishes"""
     # Open the video
-    print('Monitoring Stream from: ', video)
-    video = cv2.VideoCapture(video)
+    print('Monitoring Stream from: ', video_url)
+    video = cv2.VideoCapture(video_url)
     print('Publishing.....')
 
     # monitor frame number
@@ -62,8 +67,14 @@ def video_emitter(video):
             print("BREAK AT FRAME: {}".format(i))
             break
 
-        message = transform(image, i, camera=CAMERA_NUM, gray=GRAY)
-        frame_producer.send(frame_topic, value=message)
+        message = transform(frame=image,
+                            frame_num=i,
+                            camera=re.findall(r'cam([0-9][0-9]*?)/', video_url)[0],
+                            gray=GRAY)
+
+        print("\rCam{}_{}".format(message['camera'], i), end='')
+
+        FRAME_PRODUCER.send(FRAME_TOPIC, value=message)
 
         if i == 1:
             print(message.keys())
@@ -75,7 +86,19 @@ def video_emitter(video):
     # clear the capture
     video.release()
     print('Done Publishing...')
+    return True
 
 
 if __name__ == '__main__':
-    video_emitter(cfront_url)
+    CAMERA_URLS = [get_video_feed_url(i, FPS) for i in range(TOTAL_CAMERAS)]
+    # video_emitter(CAMERA_URLS[0])
+    # TODO: THREADING CAUSING ISSUE, CONSUMER NOT ABLE TO READ ANYTHING!!
+    producer_pool = Pool(len(CAMERA_URLS))
+    try:
+        statuses = producer_pool.map(video_emitter, CAMERA_URLS)
+        producer_pool.close()  # close pool
+        producer_pool.join()  # wait to join
+    except KeyboardInterrupt as e:
+        print(e)
+        producer_pool.terminate()
+
