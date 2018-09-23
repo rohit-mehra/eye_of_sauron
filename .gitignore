@@ -1,10 +1,12 @@
 # exclude
 
 data/cam*/videos/*
+models/*
 __pycache__
 .ipynb_checkpoints
 *.npy
 *.h5
-# include
 
+# include
 !data/*.md
+!models/*.md

@@ -15,15 +15,15 @@ import wget
 MODEL_NAME = "mnist_model.h5"
 # get model from s3--> cloudfront --> dowmload
 cfront_endpoint = "http://d3tj01z94i74qz.cloudfront.net/"
-cfront_url = cfront_endpoint + MODEL_NAME
+model_url = cfront_endpoint + MODEL_NAME
 
 if not os.path.isfile(MODEL_NAME):
-    wget.download(cfront_url, './mnist_model.h5')
+    wget.download(model_url, './mnist_model.h5')
 
 MODEL = load_model(MODEL_NAME)
 GRAPH = tf.get_default_graph()
 print(MODEL.summary())
-print("**Model Loaded from: {}".format(cfront_url))
+print("**Model Loaded from: {}".format(model_url))
 
 # KAFKA TODO: Check kafka compression, multiple consumer, threads safe producer
 

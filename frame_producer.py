@@ -11,6 +11,7 @@ TOTAL_CAMERAS = 3
 FPS = 2
 
 GRAY = True
+CAFFEE = False
 C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 
 
@@ -24,11 +25,16 @@ def get_video_feed_url(camera_num=0, fps=10):
     return C_FRONT_ENDPOINT + "cam{}/videos/cam{}_{}_fps.mp4".format(camera_num, camera_num, fps)
 
 
-def transform(frame, frame_num, camera=0, gray=False):
+def transform(frame, frame_num, camera=0, gray=False, caffee=False):
     """Serialize frame, create json message with serialized frame, camera number and timestamp."""
     
     if gray:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # (28, 28)
+
+    if caffee:
+        frame = cv2.resize(frame, (300, 300))
+
+    print(frame.shape)
 
     # serialize numpy array --> model
     # {'frame': string(base64encodedarray), 'dtype': obj.dtype.str, 'shape': obj.shape}
@@ -70,7 +76,8 @@ def video_emitter(video_url):
         message = transform(frame=image,
                             frame_num=i,
                             camera=re.findall(r'cam([0-9][0-9]*?)/', video_url)[0],
-                            gray=GRAY)
+                            gray=GRAY,
+                            caffee=CAFFEE)
 
         print("\rCam{}_{}".format(message['camera'], i), end='')
 
