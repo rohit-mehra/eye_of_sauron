@@ -2,12 +2,9 @@ from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import json
 import time
 import cv2
-import numpy as np
-# from utils import np_from_json_v2 as np_from_json
-# from utils import np_to_json_v2 as np_to_json
 from utils import np_from_json, np_to_json
-from utils import SET_PARTITIONS
-from utils import check_or_get_file, MODEL_NAME, MODEL_PATH, PROTO_NAME, PROTO_PATH, COLORS, CLASSES, CONFIDENCE
+from utils import check_or_get_file
+from params import *
 from frame_producer_v2 import FRAME_TOPIC
 import socket
 from multiprocessing import Pool
@@ -39,8 +36,6 @@ def consumer(number):
     prediction_producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
                                         key_serializer=lambda key: str(key).encode(),
                                         value_serializer=lambda value: json.dumps(value).encode())
-
-    prediction_topic_prefix = 'predicted_objs'
 
     def plot_box(detections, frame, confidence, i, h, w):
         idx = int(detections[0, 0, i, 1])
@@ -122,7 +117,7 @@ def consumer(number):
                                                                                                        result['prediction']
                                                                                                        ))
                     # camera specific topic
-                    prediction_topic = "{}_{}".format(prediction_topic_prefix, result['camera'])
+                    prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result['camera'])
                     prediction_producer.send(prediction_topic, key=result['frame_num'], value=result)
 
                 except StopIteration as e:

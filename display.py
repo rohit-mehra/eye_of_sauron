@@ -1,23 +1,21 @@
 import cv2
 from flask import Flask, Response, render_template
 from kafka import KafkaConsumer
-# from utils import np_from_json_v2 as np_from_json
-# from utils import np_to_json_v2 as np_to_json
 from utils import np_from_json
 import json
-from frame_producer_v2 import GRAY, TOTAL_CAMERAS
 from heapq import heappush, heappop
 import threading
 import time
 from collections import defaultdict
-# TODO: add three prediction topics, three retreival
+from params import *
+
 
 buffer_size = 500
 buffer_dict = defaultdict(list)
 data_dict = defaultdict(dict)
 
-prediction_topic_prefix = 'predicted_objs'
-prediction_topics = ["{}_{}".format(prediction_topic_prefix, i) for i in range(TOTAL_CAMERAS)]
+
+prediction_topics = ["{}_{}".format(PREDICTION_TOPIC_PREFIX, i) for i in range(TOTAL_CAMERAS)]
 
 prediction_consumers = [KafkaConsumer(topic, group_id='view',
                                       bootstrap_servers=['0.0.0.0:9092'],
@@ -96,41 +94,6 @@ def consume_buffer(number):
             if err_count > 18:
                 break
 
-
-# # camera specific consumer
-# def get_frame(msg_stream, number):
-#     try:
-#
-#         while True:
-#             try:
-#                 buffer = buffer_dict[number]
-#                 msg = next(msg_stream)
-#                 prediction_obj = msg.value
-#                 frame_num = int(prediction_obj['frame_num'])
-#                 png = get_png(prediction_obj)
-#
-#                 if len(buffer) < buffer_size:
-#                     heappush(buffer, frame_num)
-#                     data[frame_num] = png.tobytes()
-#                     print('\rPushed: {} {}/{}'.format(prediction_obj['frame_num'], len(buffer), buffer_size), end='')
-#                     continue
-#
-#                 fn = heappop(buffer)
-#                 yield (b'--frame\r\n'
-#                        b'Content-Type: image/png\r\n\r\n' + data[fn] + b'\r\n\r\n')
-#
-#             except StopIteration as e:
-#                 print(e)
-#                 continue
-#
-#     except KeyboardInterrupt as e:
-#         print(e)
-#         pass
-#
-#     finally:
-#         print("Closing Stream")
-#         msg_stream.close()
-#
 
 # Continuously listen to the connection and print messages as received
 app = Flask(__name__)
