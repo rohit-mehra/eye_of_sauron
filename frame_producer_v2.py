@@ -3,9 +3,13 @@ import time
 import re
 import cv2
 import numpy as np
+import os
+import imutils
 from multiprocessing import Pool
 from kafka import KafkaProducer
-from utils import np_to_json
+# from utils import np_from_json_v2 as np_from_json
+# from utils import np_to_json_v2 as np_to_json
+from utils import np_to_json, SET_PARTITIONS
 from imutils.video import VideoStream
 
 TOTAL_CAMERAS = 1
@@ -32,8 +36,8 @@ def transform(frame, frame_num, camera=0, gray=False, caffee=False):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # (28, 28)
 
     if caffee:
-        frame = cv2.resize(frame, (150, 150))
-
+        # frame = cv2.resize(frame, (300, 300))
+        frame = imutils.resize(frame, width=400)
     # serialize numpy array --> model
     # {'frame': string(base64encodedarray), 'dtype': obj.dtype.str, 'shape': obj.shape}
     frame_dict = np_to_json(frame.astype(np.uint8))
@@ -46,18 +50,18 @@ def transform(frame, frame_num, camera=0, gray=False, caffee=False):
     return message
 
 
-def video_emitter(video_url, use_cv2=True):
+def video_emitter(video_url, use_cv2=False):
     # Connect to Kafka, new producer for each thread!!!! important
     FRAME_PRODUCER = KafkaProducer(bootstrap_servers=['localhost:9092'],
-                                   key_serializer = lambda key: str(key).encode(),
+                                   key_serializer=lambda key: str(key).encode(),
                                    value_serializer=lambda value: json.dumps(value).encode(),
                                    )
+    print(FRAME_PRODUCER.partitions_for(FRAME_TOPIC))
 
     """Reads frame by frame, attaches meta data, publishes"""
     # Open the video
-
     print('Monitoring Stream from: ', video_url)
-    video = cv2.VideoCapture(video_url) if use_cv2 else VideoStream(video_url)
+    video = cv2.VideoCapture(video_url) if use_cv2 else VideoStream(video_url).start()
     print('Publishing.....')
 
     # monitor frame number
@@ -86,11 +90,13 @@ def video_emitter(video_url, use_cv2=True):
                             gray=GRAY,
                             caffee=CAFFEE)
 
-        print("\rCam{}_{}".format(message['camera'], i), end='')
+        part = i % SET_PARTITIONS
 
-        FRAME_PRODUCER.send(FRAME_TOPIC, key=i, value=message)
+        print("\rCam{}_{}_partition_{} ".format(message['camera'], i, part), end='')
 
-        if i == 1:
+        FRAME_PRODUCER.send(FRAME_TOPIC, key=i, value=message, partition=part)
+
+        if i == 0:
             print(message.keys())
 
         # To reduce CPU usage create sleep time of 0.01 sec
@@ -105,6 +111,17 @@ def video_emitter(video_url, use_cv2=True):
 
 
 if __name__ == '__main__':
+    init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 3 --partitions {} --topic frame_objects_v2".format(SET_PARTITIONS)
+    alter_cmd = "/usr/local/kafka/bin/kafka-topics.sh --alter --zookeeper localhost:2181 --topic frame_objects_v2 --partitions {}".format(SET_PARTITIONS)
+
+    os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic frame_objects_v2")
+    time.sleep(5)
+    os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic predicted_objs_0")
+
+    os.system(init_cmd)
+    time.sleep(10)
+    os.system(alter_cmd)
+
     CAMERA_URLS = [get_video_feed_url(i, FPS) for i in range(TOTAL_CAMERAS)]
     # video_emitter(CAMERA_URLS[0])
     # TODO: THREADING CAUSING ISSUE, CONSUMER NOT ABLE TO READ ANYTHING!!
@@ -116,4 +133,6 @@ if __name__ == '__main__':
     except KeyboardInterrupt as e:
         print(e)
         producer_pool.terminate()
+        os.system("/usr/local/kafka/bin/kafka-topics.sh  --zookeeper localhost:2181 --delete --topic {}".format(FRAME_TOPIC))
+        print("Done....")
 

@@ -2,6 +2,7 @@
 
 data/cam*/videos/*
 models/*
+.idea/*
 real-time-object-detection/*
 __pycache__
 .ipynb_checkpoints

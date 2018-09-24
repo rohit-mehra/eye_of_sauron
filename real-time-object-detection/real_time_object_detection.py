@@ -1,11 +1,12 @@
 """
-python real_time_object_detection.py --prototxt MobileNetSSD_deploy.prototxt.txt --model MobileNetSSD_deploy.caffemodel"""
+python real_time_object_detection.py --prototxt ../models/MobileNetSSD_deploy.prototxt.txt --model ../models/MobileNetSSD_deploy.caffemodel"""
 
 import argparse
 import time
 
 import cv2
 import imutils
+import pafy
 import numpy as np
 # import the necessary packages
 from imutils.video import FPS, VideoStream
@@ -38,8 +39,10 @@ net = cv2.dnn.readNetFromCaffe(args["prototxt"], args["model"])
 # and initialize the FPS counter
 print("[INFO] starting video stream...")
 # vs = cv2.VideoCapture('http://d3tj01z94i74qz.cloudfront.net/cam0/videos/cam0_30_fps.mp4')
+vs = cv2.VideoCapture('r.mp4')
 
-vs = VideoStream('http://d3tj01z94i74qz.cloudfront.net/cam0/videos/cam0_30_fps.mp4').start()
+# vs = VideoStream('r.mp4').start()
+
 time.sleep(1.0)
 fps = FPS().start()
 
@@ -47,10 +50,14 @@ fps = FPS().start()
 while True:
     # grab the frame from the threaded video stream and resize it
     # to have a maximum width of 400 pixels
-    frame = vs.read()
-    # et, frame = vs.read()
+    # frame = vs.read()
+    #
+    # if frame is None:
+    #     print("End of stream..")
+    #     break
+    et, frame = vs.read()
 
-    # frame = imutils.resize(frame, width=400)
+    frame = imutils.resize(frame, width=400)
 
     # grab the frame dimensions and convert it to a blob
     (h, w) = frame.shape[:2]
