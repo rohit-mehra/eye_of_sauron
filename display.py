@@ -14,7 +14,7 @@ from collections import defaultdict
 
 buffer_size = 500
 buffer_dict = defaultdict(list)
-data = dict()
+data_dict = defaultdict(dict)
 
 prediction_topic_prefix = 'predicted_objs'
 prediction_topics = ["{}_{}".format(prediction_topic_prefix, i) for i in range(TOTAL_CAMERAS)]
@@ -49,6 +49,7 @@ def populate_buffer(msg_stream, number):
         while True:
             try:
                 buffer = buffer_dict[number]
+                data = data_dict[number]
                 msg = next(msg_stream)
                 prediction_obj = msg.value
                 frame_num = int(prediction_obj['frame_num'])
@@ -77,6 +78,7 @@ def populate_buffer(msg_stream, number):
 
 def consume_buffer(number):
     buffer = buffer_dict[number]
+    data = data_dict[number]
     print("Waiting for buffer to fill..")
     event.wait()
     print("Pushing to Flask..")
@@ -138,6 +140,7 @@ app = Flask(__name__)
 def cam(number):
     # return a multipart response
     buffer_dict[number] = []
+    data_dict[number] = dict()
     b_thread = threading.Thread(target=populate_buffer, args=[prediction_consumers[int(number)], number])
     b_thread.start()
     return Response(consume_buffer(number),  # get_frame(prediction_consumers[int(number)]),

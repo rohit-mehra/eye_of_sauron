@@ -12,7 +12,7 @@ from kafka import KafkaProducer
 from utils import np_to_json, SET_PARTITIONS
 from imutils.video import VideoStream
 
-TOTAL_CAMERAS = 1
+TOTAL_CAMERAS = 3
 FPS = 30
 
 GRAY = False
@@ -50,7 +50,7 @@ def transform(frame, frame_num, camera=0, gray=False, caffee=False):
     return message
 
 
-def video_emitter(video_url, use_cv2=False):
+def video_emitter(video_url, use_cv2=True):
     # Connect to Kafka, new producer for each thread!!!! important
     FRAME_PRODUCER = KafkaProducer(bootstrap_servers=['localhost:9092'],
                                    key_serializer=lambda key: str(key).encode(),
@@ -104,8 +104,10 @@ def video_emitter(video_url, use_cv2=False):
         i += 1
 
     # clear the capture
-    # video.release()
-    video.stop()
+    if use_cv2:
+        video.release()
+    else:
+        video.stop()
     print('Done Publishing...')
     return True
 
@@ -116,7 +118,8 @@ if __name__ == '__main__':
 
     os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic frame_objects_v2")
     time.sleep(5)
-    os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic predicted_objs_0")
+    for i in range(TOTAL_CAMERAS):
+        os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic predicted_objs_{}".format(i))
 
     os.system(init_cmd)
     time.sleep(10)
