@@ -1,5 +1,8 @@
 """Set Parameters for the APP here...."""
 import numpy as np
+import os
+
+file_dir = os.path.dirname(os.path.realpath(__file__))
 
 # TOPIC USED TO PUBLISH ALL FRAME OBJECTS
 FRAME_TOPIC = 'frame_objects_v2'
@@ -8,9 +11,14 @@ PREDICTION_TOPIC_PREFIX = 'predicted_objects'
 # ENDPOINT FOR VIDEO STREAMS
 C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 # TOTAL CAMERAS TO BE USED --> USED FOR FULL URL
-TOTAL_CAMERAS = 3
+TOTAL_CAMERAS = 4
 # FPS OF STREAM --> USED FOR FULL URL
 FPS = 30
+
+# USE RAW CV2 STREAMING or FAST BUT LESS FRAMES
+
+USE_RAW_CV2_STREAMING = False
+
 # IF THE VIDEO IS GRAY, MNIST WAS USED TO TEST STREAMING --> USED TO SET FRAME DIMENSIONS TO (28, 28)
 GRAY = False
 # IF THE MODEL USED IS CAFFEE --> SET FRAME DIMENSIONS TO (300, 300)
@@ -28,8 +36,8 @@ ALTER_CMD = "/usr/local/kafka/bin/kafka-topics.sh --alter --zookeeper localhost:
 MODEL_NAME = "MobileNetSSD_deploy.caffemodel"
 PROTO_NAME = "MobileNetSSD_deploy.prototxt.txt"
 
-MODEL_PATH = "models/{}".format(MODEL_NAME)
-PROTO_PATH = "models/{}".format(PROTO_NAME)
+MODEL_PATH = file_dir + "/models/{}".format(MODEL_NAME)
+PROTO_PATH = file_dir + "/models/{}".format(PROTO_NAME)
 
 TARGET = "person"
 # CLASS LABELS ML MODEL(MobileNet SSD) WAS TRAINED ON
@@ -83,6 +91,9 @@ COLORS = np.array([[217.63093899006873, 39.443811774140016, 181.07467002104076],
 
 # MINIMUM CONFIDENCE TO CONSIDER A CLASS
 CONFIDENCE = 0.3
+
+ORIGINAL_PREFIX = 'predicted'
+PREDICTED_PREFIX = 'predicted'
 
 
 
