@@ -32,7 +32,16 @@ INIT_CMD = "/usr/local/kafka/bin/kafka-topics.sh --create --zookeeper localhost:
 ALTER_CMD = "/usr/local/kafka/bin/kafka-topics.sh --alter --zookeeper localhost:2181 " \
             "--topic frame_objects_v2 --partitions {}".format(SET_PARTITIONS)
 
+DL = "object_detection"
+
 # OBJECT DETECTION MODEL NAME/LOCATION
+OD_MODEL_NAME = "MobileNetSSD_deploy.caffemodel"
+OD_PROTO_NAME = "MobileNetSSD_deploy.prototxt.txt"
+
+OD_MODEL_PATH = file_dir + "/models/{}".format(OD_MODEL_NAME)
+OD_PROTO_PATH = file_dir + "/models/{}".format(OD_PROTO_NAME)
+
+# CLASSIFICATION MODEL NAME/LOCATION
 MODEL_NAME = "mobilenet_v2.caffemodel"  # ""bvlc_googlenet.caffemodel"
 PROTO_NAME = "mobilenet_v2_deploy.prototxt"  # "bvlc_googlenet.prototxt"
 LABEL_NAME = "synset_words.txt"

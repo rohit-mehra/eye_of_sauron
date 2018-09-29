@@ -3,7 +3,7 @@ import json
 import time
 import cv2
 from utils import np_from_json, np_to_json
-from utils import check_or_get_file
+from utils import get_model_proto
 from params import *
 from frame_producer_v3 import FRAME_TOPIC
 import socket
@@ -38,7 +38,7 @@ def consumer(number):
         # load our serialized model from disk
         print("[INFO] loading model...")
 
-        model = cv2.dnn.readNetFromCaffe(PROTO_PATH, MODEL_PATH)
+        model = cv2.dnn.readNetFromCaffe(proto_path, model_path)
 
         print("[INFO] Loaded...")
 
@@ -118,7 +118,7 @@ def consumer(number):
         # load our serialized model from disk
         print("[INFO] loading model...")
 
-        model = cv2.dnn.readNetFromCaffe(PROTO_PATH, MODEL_PATH)
+        model = cv2.dnn.readNetFromCaffe(proto_path, model_path)
 
         print("[INFO] Loaded...")
         frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
@@ -173,7 +173,10 @@ def consumer(number):
             while True:
                 try:
                     msg = next(msg_stream)
-                    result = get_classification_object(msg.value)
+                    if DL == "object_detection":
+                        result = get_detection_object(msg.value)
+                    else:
+                        result = get_classification_object(msg.value)
                     print("timestamp: {}, frame_num: {},camera_num: {}, latency: {}, y_hat: {}".format(
                         result['timestamp'],
                         result['frame_num'],
@@ -204,9 +207,7 @@ def consumer(number):
 
 if __name__ == '__main__':
     # check or get model from s3--> cloud front --> download
-    check_or_get_file(MODEL_PATH, MODEL_NAME)
-    check_or_get_file(PROTO_PATH, PROTO_NAME)
-    check_or_get_file(LABEL_PATH, LABEL_NAME)
+    model_path, proto_path, _ = get_model_proto(target=DL)
 
     THREADS = 2 if SET_PARTITIONS == 8 else 1
     NUMBERS = [i for i in range(THREADS)]

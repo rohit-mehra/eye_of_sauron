@@ -28,6 +28,20 @@ def check_or_get_file(file_path, file_name):
     print("[INFO]{} present..".format(file_path))
 
 
+def get_model_proto(target):
+    if target == "object_detection":
+        check_or_get_file(OD_MODEL_PATH, OD_MODEL_NAME)
+        check_or_get_file(OD_PROTO_PATH, OD_PROTO_NAME)
+        check_or_get_file(LABEL_PATH, LABEL_NAME)
+        return OD_MODEL_PATH, OD_PROTO_PATH, LABEL_PATH
+
+    if target == "image_classification":
+        check_or_get_file(MODEL_PATH, MODEL_NAME)
+        check_or_get_file(PROTO_PATH, PROTO_NAME)
+        check_or_get_file(LABEL_PATH, LABEL_NAME)
+        return MODEL_PATH, PROTO_PATH, LABEL_PATH
+
+
 def np_to_json(obj, prefix_name=''):
     """Serialize numpy.ndarray obj"""
     return {'{}_frame'.format(prefix_name): base64.b64encode(obj.tostring()).decode("utf-8"),
