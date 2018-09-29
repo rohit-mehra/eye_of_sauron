@@ -9,14 +9,9 @@ from collections import defaultdict
 
 from params import *
 from utils import cleanup_topics, init_frame_topic, get_video_feed_url
-from frame_producer_v2 import StreamVideo
+from frame_producer_v3 import StreamVideo
 
 import threading
-import logging
-
-
-# logging.basicConfig(level=logging.INFO,
-#                     format='[%(threadName)-6s] %(message)s')
 
 
 def get_png(prediction_obj):

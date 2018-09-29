@@ -9,11 +9,6 @@ from imutils.video import VideoStream
 from params import *
 
 from multiprocessing import Process
-import logging
-
-
-# logging.basicConfig(level=logging.INFO,
-#                     format='[%(threadName)-6s] %(message)s')
 
 
 class StreamVideo(Process):

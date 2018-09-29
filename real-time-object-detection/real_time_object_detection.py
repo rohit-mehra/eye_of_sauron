@@ -6,7 +6,6 @@ import time
 
 import cv2
 import imutils
-import pafy
 import numpy as np
 # import the necessary packages
 from imutils.video import FPS, VideoStream
