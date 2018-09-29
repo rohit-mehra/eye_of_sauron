@@ -42,6 +42,7 @@ PROTO_PATH = file_dir + "/models/{}".format(PROTO_NAME)
 LABEL_PATH = file_dir + "/models/{}".format(LABEL_NAME)
 
 TARGET = "person"
+
 # CLASS LABELS ML MODEL(MobileNet SSD) WAS TRAINED ON
 CLASSES = ["background",
            "aeroplane",

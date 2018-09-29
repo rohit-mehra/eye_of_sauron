@@ -19,14 +19,6 @@ def consumer(number):
     iam = "{}-{}".format(socket.gethostname(), number)
     print("[INFO] I am ", iam)
 
-    # LABEL NAMES
-    label_names = np.loadtxt(LABEL_PATH, str, delimiter='\t')
-
-    # load our serialized model from disk
-    print("[INFO] loading model...")
-    model = cv2.dnn.readNetFromCaffe(PROTO_PATH, MODEL_PATH)
-    print("[INFO] Loaded...")
-
     # KAFKA TODO: Check kafka compression, multiple consumer, threads safe producer
 
     # Connect to kafka, Consume frame obj bytes deserialize to json
@@ -42,6 +34,16 @@ def consumer(number):
 
     def get_classification_object(frame_obj):
         """Processes value produced by producer, returns prediction with png image."""
+
+        # load our serialized model from disk
+        print("[INFO] loading model...")
+
+        model = cv2.dnn.readNetFromCaffe(PROTO_PATH, MODEL_PATH)
+
+        print("[INFO] Loaded...")
+
+        # LABEL NAMES
+        label_names = np.loadtxt(LABEL_PATH, str, delimiter='\t')
 
         frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
         # This CNN requires fixed spatial dimensions for our input image(s)
@@ -91,6 +93,81 @@ def consumer(number):
 
         return result
 
+    def plot_box(detections, frame, confidence, i, h, w):
+        """Plot a box on the frame"""
+        idx = int(detections[0, 0, i, 1])
+        box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+        (startX, startY, endX, endY) = box.astype("int")
+
+        # draw the prediction on the frame
+        label = "{}: {:.2f}%".format(CLASSES[idx],
+                                     confidence * 100)
+
+        cv2.rectangle(frame, (startX, startY), (endX, endY),
+                      COLORS[idx], 2)
+        y = startY - 15 if startY - 15 > 15 else startY + 15
+
+        cv2.putText(frame, label, (startX, y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, COLORS[idx], 2)
+
+        return frame, label
+
+    def get_detection_object(frame_obj):
+        """Processes value produced by producer, returns prediction with png image."""
+
+        # load our serialized model from disk
+        print("[INFO] loading model...")
+
+        model = cv2.dnn.readNetFromCaffe(PROTO_PATH, MODEL_PATH)
+
+        print("[INFO] Loaded...")
+        frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
+
+        # grab the frame dimensions and convert it to a blob
+        (h, w) = frame.shape[:2]
+        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)),
+                                     0.007843, (300, 300), 127.5)
+        # pass the blob through the network and obtain the detections and
+        # predictions
+        model.setInput(blob)
+        detections = model.forward()
+
+        model_out = None
+        max_confidence = 0
+
+        # loop over the detections
+        for i in np.arange(0, detections.shape[2]):
+            # extract the confidence (i.e., probability) associated with
+            # the prediction
+            confidence = detections[0, 0, i, 2]
+
+            # filter out weak detections by ensuring the `confidence` is
+            # greater than the minimum confidence
+            if confidence > CONFIDENCE:
+                # extract the index of the class label from the
+                # `detections`, then compute the (x, y)-coordinates of
+                # the bounding box for the object
+
+                frame, label = plot_box(detections, frame, confidence, i, h, w)
+
+                if confidence > max_confidence:
+                    model_out = label
+                    max_confidence = confidence
+
+        # frame = cv2.resize(frame, (150, 150))
+        frame_dict = np_to_json(frame.astype(np.uint8), prefix_name=PREDICTED_PREFIX)
+
+        result = {"prediction": str(model_out),
+                  "predict_time": str(time.time()),
+                  "latency": str(time.time() - int(frame_obj['timestamp']))}
+        print(result)
+
+        frame_obj.update(frame_dict)  # update frame with boundaries
+
+        result.update(frame_obj)
+
+        return result
+
     def process_stream(msg_stream):
         try:
             while True:
@@ -126,9 +203,6 @@ def consumer(number):
 
 
 if __name__ == '__main__':
-    # frame_consumer.assign([TopicPartition(FRAME_TOPIC, 3)])
-    # print(frame_consumer.assignment())
-    # process_stream(frame_consumer)
     # check or get model from s3--> cloud front --> download
     check_or_get_file(MODEL_PATH, MODEL_NAME)
     check_or_get_file(PROTO_PATH, PROTO_NAME)
