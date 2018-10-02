@@ -2,21 +2,22 @@ from kafka import KafkaConsumer, KafkaProducer
 import json
 import time
 import cv2
+from keras.models import load_model
+import tensorflow as tf
 from utils import np_from_json, np_to_json
 from utils import get_model_proto
 from params import *
-from frame_producer_v3 import FRAME_TOPIC
 import socket
 from multiprocessing import Pool
 
 
-def consumer(number):
+def consumer(consumer_number):
     """CONSUME video frames, predictions Published to respective camera topics
     Args:
-        number: consumer number
+        consumer_number: consumer number
     """
     # Declare unique client name
-    iam = "{}-{}".format(socket.gethostname(), number)
+    iam = "{}-{}".format(socket.gethostname(), consumer_number)
     print("[INFO] I am ", iam)
 
     # KAFKA TODO: Check kafka compression, multiple consumer, threads safe producer
@@ -32,8 +33,13 @@ def consumer(number):
                                         key_serializer=lambda key: str(key).encode(),
                                         value_serializer=lambda value: json.dumps(value).encode())
 
-    def get_classification_object(frame_obj):
-        """Processes value produced by producer, returns prediction with png image."""
+    if DL == "mnist":
+        model = load_model(model_path)
+        graph = tf.get_default_graph()
+        print(model.summary())
+        print("**Model Loaded from: {}".format(model_path))
+
+    else:
 
         # load our serialized model from disk
         print("[INFO] loading model...")
@@ -42,8 +48,12 @@ def consumer(number):
 
         print("[INFO] Loaded...")
 
+    if DL == "image_classification":
         # LABEL NAMES
         label_names = np.loadtxt(LABEL_PATH, str, delimiter='\t')
+
+    def get_classification_object(frame_obj):
+        """Processes value produced by producer, returns prediction with png image."""
 
         frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
         # This CNN requires fixed spatial dimensions for our input image(s)
@@ -114,13 +124,6 @@ def consumer(number):
 
     def get_detection_object(frame_obj):
         """Processes value produced by producer, returns prediction with png image."""
-
-        # load our serialized model from disk
-        print("[INFO] loading model...")
-
-        model = cv2.dnn.readNetFromCaffe(proto_path, model_path)
-
-        print("[INFO] Loaded...")
         frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
 
         # grab the frame dimensions and convert it to a blob
@@ -130,7 +133,9 @@ def consumer(number):
         # pass the blob through the network and obtain the detections and
         # predictions
         model.setInput(blob)
+        pred_start = time.time()
         detections = model.forward()
+        print("Prediction time: ", time.time() - pred_start)
 
         model_out = None
         max_confidence = 0
@@ -160,7 +165,45 @@ def consumer(number):
         result = {"prediction": str(model_out),
                   "predict_time": str(time.time()),
                   "latency": str(time.time() - int(frame_obj['timestamp']))}
-        print(result)
+
+        frame_obj.update(frame_dict)  # update frame with boundaries
+
+        result.update(frame_obj)
+
+        return result
+
+    def get_mnist_object(frame_obj):
+        """Processes value produced by producer, returns prediction with png image."""
+
+        frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
+
+        # MNIST SPECIFIC
+        frame = frame.reshape(28, 28, 1)
+
+        # batch
+        model_in = np.expand_dims(frame, axis=0)
+
+        # predict
+        with graph.as_default():
+            pred_start = time.time()
+            model_out = np.argmax(np.squeeze(model.predict(model_in)))
+            print("Prediction time: ", time.time() - pred_start)
+
+        # TODO: DISPLAY IF ITS LABEL OF INTEREST
+        text = "{}".format(model_out)
+
+        # RESIZE FOR VIEWING ON FLASK
+        frame = cv2.resize(frame, (90, 90))
+
+        cv2.putText(frame, text, (5, 25), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5, (255, 255, 255), 1)
+
+        # frame = cv2.resize(frame, (150, 150))
+        frame_dict = np_to_json(frame.astype(np.uint8), prefix_name=PREDICTED_PREFIX)
+
+        result = {"prediction": str(model_out),
+                  "predict_time": str(time.time()),
+                  "latency": str(time.time() - int(frame_obj['timestamp']))}
 
         frame_obj.update(frame_dict)  # update frame with boundaries
 
@@ -170,13 +213,24 @@ def consumer(number):
 
     def process_stream(msg_stream):
         try:
+            null_count = 0
             while True:
                 try:
                     msg = next(msg_stream)
+                    if not msg:
+                        null_count += 1
+                        print(null_count)
                     if DL == "object_detection":
                         result = get_detection_object(msg.value)
-                    else:
+                    elif DL == "image_classification":
                         result = get_classification_object(msg.value)
+                    elif DL == "mnist":
+                        result = get_mnist_object(msg.value)
+                    else:
+                        print("WRONG [DL] option, check params.py, options = \
+                          mnist/object_detection/image_classification ")
+                        break
+
                     print("timestamp: {}, frame_num: {},camera_num: {}, latency: {}, y_hat: {}".format(
                         result['timestamp'],
                         result['frame_num'],
@@ -184,12 +238,14 @@ def consumer(number):
                         result['latency'],
                         result['prediction']
                         ))
+
                     # camera specific topic
                     prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result['camera'])
+
                     prediction_producer.send(prediction_topic, key=result['frame_num'], value=result)
 
-                except StopIteration as e:
-                    print(e)
+                except StopIteration as excep:
+                    print(excep)
                     continue
 
         except KeyboardInterrupt as e:
@@ -207,10 +263,13 @@ def consumer(number):
 
 if __name__ == '__main__':
     # check or get model from s3--> cloud front --> download
+    # specific DL model
     model_path, proto_path, _ = get_model_proto(target=DL)
 
     THREADS = 2 if SET_PARTITIONS == 8 else 1
     NUMBERS = [i for i in range(THREADS)]
+
+    print(NUMBERS)
     consumer_pool = Pool(THREADS)
     try:
         statuses = consumer_pool.map(consumer, NUMBERS)

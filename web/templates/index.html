@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>The Eye</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
+          integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+</head>
+<body>
+<div class="container">
+
+    <div class="row">
+
+        <div class="col-lg-12"  align="center">
+            <h1 class="page-header">The Eye of Sauron</h1>
+        </div>
+        <div class="col-lg-12">
+            {{ dropzone.load() }}
+            {{ dropzone.style('border: 2px dashed #A9A9A9; margin: 10%; min-height: 300px;') }}
+            {{ dropzone.create(action_view='index') }}
+
+        </div>
+
+    </div>
+</div>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
+        integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
+        crossorigin="anonymous"></script>
+
+</body>
+</html>
+
+
+{#<html>#}
+{#  <head>#}
+{#    <title>Real Time Streaming</title>#}
+{#  </head>#}
+{#  <body>#}
+{#    <h1>The Eye of Sauron</h1>#}
+{#    {% for number in camera_numbers %}#}
+{#        <img src="{{ url_for("cam", cam_num=number)}}" width="120" height="120">#}
+{#    {% endfor %}#}
+{#  </body>#}
+{#</html>#}

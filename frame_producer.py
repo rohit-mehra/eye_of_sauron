@@ -5,9 +5,9 @@ import cv2
 import numpy as np
 from multiprocessing import Pool
 from kafka import KafkaProducer
-from utils import np_to_json
+from utils import np_to_json, get_mnist_feed_url, cleanup_topics, init_frame_topic
 
-TOTAL_CAMERAS = 3
+TOTAL_CAMERAS = 6
 FPS = 2
 
 GRAY = True
@@ -17,12 +17,6 @@ C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 
 # TOPIC USED TO PUBLISH ALL FRAMES TO
 FRAME_TOPIC = 'frame_objects'
-
-
-def get_video_feed_url(camera_num=0, fps=10):
-    """Gets the camera IP, where video is being streamed"""
-    # serving from s3 bucket via cloudFront: url to the object
-    return C_FRONT_ENDPOINT + "cam{}/videos/cam{}_{}_fps.mp4".format(camera_num, camera_num, fps)
 
 
 def transform(frame, frame_num, camera=0, gray=False, caffee=False):
@@ -97,7 +91,11 @@ def video_emitter(video_url):
 
 
 if __name__ == '__main__':
-    CAMERA_URLS = [get_video_feed_url(i, FPS) for i in range(TOTAL_CAMERAS)]
+
+    cleanup_topics(frame_topic='frame_objects')
+    init_frame_topic(frame_topic='frame_objects')
+
+    CAMERA_URLS = [get_mnist_feed_url(i, FPS) for i in range(TOTAL_CAMERAS)]
     # video_emitter(CAMERA_URLS[0])
     # TODO: THREADING CAUSING ISSUE, CONSUMER NOT ABLE TO READ ANYTHING!!
     producer_pool = Pool(len(CAMERA_URLS))
