@@ -1,6 +1,5 @@
 import base64
 import json
-import os
 import time
 from heapq import heappush, heappop
 
@@ -224,6 +223,11 @@ def clear_frame_topic(frame_topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
     os.system(alter_cmd)
 
 
+def clear_known_face_topic():
+    os.system(
+        "/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}".format(KNOWN_FACE_TOPIC))
+
+
 def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX, ):
     for i in range(TOTAL_CAMERAS + 1, 0, -1):
         print()
@@ -287,16 +291,13 @@ def np_from_json_v2(obj):
                          ).reshape(obj['shape'])
 
 
-def get_video_feed_url(camera_num=0, fps=30):
+def get_video_feed_url(camera_num=0, folder="videos"):
     """Get CAMERA IP from where video is being streamed.
-    Args:
-        camera_num: camera number
-        fps: fps os stream
     Returns:
         A URL to the stream.
     """
     # serving from s3 bucket via cloudFront: url to the object
-    return C_FRONT_ENDPOINT + "videos/cam{}_{}_fps.mp4".format(camera_num, fps)
+    return C_FRONT_ENDPOINT + "{}/{}.mp4".format(folder, camera_num)
 
 
 def get_mnist_feed_url(camera_num=0, fps=2):

@@ -1,14 +1,17 @@
-from kafka import KafkaConsumer, KafkaProducer
 import json
-import time
-import cv2
-from keras.models import load_model
-import tensorflow as tf
-from utils import np_from_json, np_to_json
-from utils import get_model_proto
-from params import *
 import socket
+import time
 from multiprocessing import Pool
+
+import cv2
+import face_recognition
+import tensorflow as tf
+from kafka import KafkaConsumer, KafkaProducer
+from keras.models import load_model
+
+from params import *
+from utils import get_model_proto
+from utils import np_from_json, np_to_json
 
 
 def consumer(consumer_number):
@@ -33,13 +36,18 @@ def consumer(consumer_number):
                                         key_serializer=lambda key: str(key).encode(),
                                         value_serializer=lambda value: json.dumps(value).encode())
 
+    # Connect to kafka, Consume known face object to know what faces are the target
+    known_faces_consumer = KafkaConsumer(KNOWN_FACE_TOPIC, group_id=str(socket.gethostname()), client_id=iam,
+                                         bootstrap_servers=['0.0.0.0:9092'],
+                                         value_deserializer=lambda value: json.loads(value.decode()))
+
     if DL == "mnist":
         model = load_model(model_path)
         graph = tf.get_default_graph()
         print(model.summary())
         print("**Model Loaded from: {}".format(model_path))
 
-    else:
+    elif DL != "tracking":
 
         # load our serialized model from disk
         print("[INFO] loading model...")
@@ -51,6 +59,59 @@ def consumer(consumer_number):
     if DL == "image_classification":
         # LABEL NAMES
         label_names = np.loadtxt(LABEL_PATH, str, delimiter='\t')
+
+    def get_face_object(frame_obj, known_faces_data):
+        """Processes value produced by producer, returns prediction with png image."""
+
+        frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
+        frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+        known_face_encodings = np_from_json(known_faces_data, prefix_name="known_face_encodings").tolist()  # (n, 128)
+        known_face_names = np_from_json(known_faces_data, prefix_name="known_face_names").tolist()  # (n, )
+
+        # Find all the faces and face encodings in the current frame of video
+        face_locations = face_recognition.face_locations(frame)
+        face_encodings = face_recognition.face_encodings(frame, face_locations)
+
+        # faces found in this image
+        face_names = []
+        for face_encoding in face_encodings:
+            # See if the face is a match for the known face(s)
+            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+            name = "Unknown"
+
+            # If a match was found in known_face_encodings, just use the first one.
+            if True in matches:
+                first_match_index = matches.index(True)
+                name = known_face_names[first_match_index]
+
+            face_names.append(name.title())
+
+        # SAVE the results for this frame
+        for (top, right, bottom, left), name in zip(face_locations, face_names):
+            # Draw a box around the face
+            cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+
+            # Draw a label with a name below the face
+            cv2.rectangle(frame, (left, bottom - 27), (right, bottom), (0, 0, 255), cv2.FILLED)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+
+        # frame = cv2.resize(frame, (150, 150))
+        frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+        frame_dict = np_to_json(frame, prefix_name=PREDICTED_PREFIX)
+        prediction = None
+        if face_names:
+            prediction = face_names[0]
+
+        result = {"prediction": prediction,
+                  "predict_time": str(time.time()),
+                  "latency": str(time.time() - int(frame_obj['timestamp']))}
+
+        frame_obj.update(frame_dict)  # update frame with prediction
+
+        result.update(frame_obj)
+
+        return result
 
     def get_classification_object(frame_obj):
         """Processes value produced by producer, returns prediction with png image."""
@@ -211,16 +272,21 @@ def consumer(consumer_number):
 
         return result
 
-    def process_stream(msg_stream):
+    def process_stream(msg_stream, known_faces_message=None):
         try:
             null_count = 0
             while True:
                 try:
+                    print("[CONSUMER {}] WAITING FOR NEXT FRAME..".format(socket.gethostname()))
                     msg = next(msg_stream)
+
                     if not msg:
                         null_count += 1
                         print(null_count)
-                    if DL == "object_detection":
+
+                    if DL == "tracking":
+                        result = get_face_object(msg.value, known_faces_message.value)
+                    elif DL == "object_detection":
                         result = get_detection_object(msg.value)
                     elif DL == "image_classification":
                         result = get_classification_object(msg.value)
@@ -237,7 +303,7 @@ def consumer(consumer_number):
                         result['camera'],
                         result['latency'],
                         result['prediction']
-                        ))
+                    ))
 
                     # camera specific topic
                     prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result['camera'])
@@ -256,7 +322,14 @@ def consumer(consumer_number):
             print("Closing Stream")
             msg_stream.close()
 
-    process_stream(frame_consumer)
+    if DL == "tracking":
+        print("[CONSUMER {}] WAITING FOR TRACKING INFO..".format(socket.gethostname()))
+        broadcast_msg = next(known_faces_consumer)
+        print("[CONSUMER {}] GOT TRACKING INFO..".format(socket.gethostname()))
+        process_stream(frame_consumer, broadcast_msg)
+
+    else:
+        process_stream(frame_consumer)
 
     return True
 
@@ -264,12 +337,13 @@ def consumer(consumer_number):
 if __name__ == '__main__':
     # check or get model from s3--> cloud front --> download
     # specific DL model
-    model_path, proto_path, _ = get_model_proto(target=DL)
+    print("Objective: ", DL)
+    if DL != "tracking":
+        model_path, proto_path, _ = get_model_proto(target=DL)
 
     THREADS = 2 if SET_PARTITIONS == 8 else 1
     NUMBERS = [i for i in range(THREADS)]
 
-    print(NUMBERS)
     consumer_pool = Pool(THREADS)
     try:
         statuses = consumer_pool.map(consumer, NUMBERS)

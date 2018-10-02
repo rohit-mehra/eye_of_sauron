@@ -4,10 +4,13 @@ import os
 
 file_dir = os.path.dirname(os.path.realpath(__file__))
 
-DL = "object_detection"
+# DL = "object_detection"
 # DL = "mnist"
 # DL = "image_classification"
+DL = "tracking"
 
+# BROADCAST KNOWN FACE ENCODINGS OR PEOPLE TO FIND
+KNOWN_FACE_TOPIC = "target_faces"
 # TOPIC USED TO PUBLISH ALL FRAME OBJECTS
 FRAME_TOPIC = DL
 # PREDICTION TOPIC PREFIX, EACH CAMERA GETS NEW TOPIC FOR PUBLISHED PREDICTIONS

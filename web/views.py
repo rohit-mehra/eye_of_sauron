@@ -1,17 +1,20 @@
 import json
+import shutil
 import sys
 import threading
 from collections import defaultdict
-import shutil
+
+import cv2
+import face_recognition
 from flask import Response, render_template, request, url_for, redirect, session
 from flask_dropzone import Dropzone
 from flask_uploads import UploadSet, configure_uploads, IMAGES, patch_request_class
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, KafkaProducer
 
 from web import app
 
 sys.path.insert(0, '..')
-from utils import populate_buffer, consume_buffer, consumer
+from utils import populate_buffer, consume_buffer, consumer, np_to_json
 from params import *
 
 BUFFER_SIZE = 180
@@ -29,7 +32,7 @@ if os.path.isdir(save_dir):
 else:
     os.makedirs(save_dir)
 
-print(os.getcwd() + '/data/query_faces')
+print(save_dir)
 
 dropzone = Dropzone(app)
 
@@ -47,6 +50,9 @@ app.config['UPLOADED_PHOTOS_DEST'] = os.getcwd() + '/data/query_faces'
 photos = UploadSet('photos', IMAGES)
 configure_uploads(app, photos)
 patch_request_class(app)  # set maximum file size, default is 16MB
+
+broadcast_known_faces = KafkaProducer(bootstrap_servers=['localhost:9092'],
+                                      value_serializer=lambda value: json.dumps(value).encode())
 
 
 @app.route('/cam/<cam_num>')
@@ -74,12 +80,19 @@ def index():
     # set session for image results
     if "file_urls" not in session:
         session['file_urls'] = []
+        session['known_face_names'] = []
 
     # list to hold our uploaded image urls
     file_urls = session['file_urls']
+    known_face_names = session['known_face_names']
+    known_face_encodings = []
+    image_file_names = []
+
     # handle image upload from Dropszone
     if request.method == 'POST':
         file_obj = request.files
+
+        # COLLECT TARGET FACE NAMES AND ENCODINGS
         for f in file_obj:
             file = request.files.get(f)
 
@@ -88,11 +101,72 @@ def index():
                 file,
                 name=file.filename
             )
+            image_file_names.append(filename)
 
-            # append image urls
+            file_path = "{}/{}".format(save_dir, filename)
+            # Load a picture and learn how to recognize it.
+            image = face_recognition.load_image_file(file_path)
+
+            # Get encoding, out of all the first one, assumption just one face in the query image
+            image_encoding = face_recognition.face_encodings(image)[0]
+            # append image encoding
+            known_face_encodings.append(image_encoding)
+            # append image name
+            known_face_names.append(filename[:filename.index(".")].title())
+            # append image url
             file_urls.append(photos.url(filename))
 
+        # print(np.array(known_face_encodings), np.array(known_face_names))
+        # print(np.array(known_face_encodings).shape, np.array(known_face_names).shape)
+
+        # TODO: BROADCAST THE TARGET TO LOOK FOR:
+        broadcast_message = np_to_json(np.array(known_face_encodings), prefix_name="known_face_encodings")
+        broadcast_message.update(np_to_json(np.array(known_face_names), prefix_name="known_face_names"))
+        broadcast_known_faces.send(KNOWN_FACE_TOPIC, value=broadcast_message)
+
+        # DISPLAY
+        face_locations = []  # collect found face location
+        face_encodings = []
+        face_names = []  # collect found face names
+
+        # loop over uploaded images, in reality loop over test images or frames
+        for filename in image_file_names:
+
+            file_path = "{}/{}".format(save_dir, filename)
+            image = face_recognition.load_image_file(file_path)
+
+            # Find all the faces and face encodings in the current frame of video
+            face_locations = face_recognition.face_locations(image)
+            face_encodings = face_recognition.face_encodings(image, face_locations)
+
+            # faces found in this image
+            face_names = []
+            for face_encoding in face_encodings:
+                # See if the face is a match for the known face(s)
+                matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
+                name = "Unknown"
+
+                # If a match was found in known_face_encodings, just use the first one.
+                if True in matches:
+                    first_match_index = matches.index(True)
+                    name = known_face_names[first_match_index]
+
+                face_names.append(name.title())
+
+            # SAVE the results for this frame
+            for (top, right, bottom, left), name in zip(face_locations, face_names):
+                # Draw a box around the face
+                cv2.rectangle(image, (left, top), (right, bottom), (0, 0, 255), 2)
+
+                # Draw a label with a name below the face
+                cv2.rectangle(image, (left, bottom - 27), (right, bottom), (0, 0, 255), cv2.FILLED)
+                font = cv2.FONT_HERSHEY_DUPLEX
+                cv2.putText(image, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+
+            cv2.imwrite(file_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
         session['file_urls'] = file_urls
+        session['known_face_names'] = known_face_names
         return "uploading..."
 
     # show the form, if wasn't submitted
@@ -101,7 +175,6 @@ def index():
 
 @app.route('/results', methods=['GET', 'POST'])
 def results():
-
     if request.method == 'POST':
         camera_numbers = int(request.form['camera_numbers'])
         return redirect(url_for('get_cameras', camera_numbers=camera_numbers), code=302)
@@ -112,9 +185,11 @@ def results():
 
     # set the file_urls and remove the session variable
     file_urls = session['file_urls']
+    known_face_names = session['known_face_names']
     session.pop('file_urls', None)
+    session.pop('known_face_names', None)
 
-    return render_template('results.html', file_urls=file_urls)
+    return render_template('results.html', file_urls_names=zip(file_urls, known_face_names))
 
 
 """----------------------------CONSUMPTION----------------------------"""

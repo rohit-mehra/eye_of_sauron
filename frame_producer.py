@@ -1,17 +1,19 @@
 import json
-import time
 import re
+import time
+from multiprocessing import Process
+
 import cv2
 import imutils
-from kafka import KafkaProducer
-from utils import np_to_json, clear_frame_topic, clear_prediction_topics, get_video_feed_url, get_mnist_feed_url
 from imutils.video import VideoStream
-from params import *
+from kafka import KafkaProducer
 
-from multiprocessing import Process
+from params import *
+from utils import np_to_json, get_video_feed_url, get_mnist_feed_url
 
 
 class StreamVideo(Process):
+    """Video Streaming Producer Process Class."""
     def __init__(self, video_path,
                  topic,
                  topic_partitions=4,
@@ -139,7 +141,8 @@ class StreamVideo(Process):
             frame = imutils.resize(frame, width=400)
 
         # serialize frame
-        frame_dict = np_to_json(frame.astype(np.uint8), prefix_name=object_key)
+        # frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+        frame_dict = np_to_json(frame, prefix_name=object_key)
         # Metadata for frame
         message = {"timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         # add frame and metadata related to frame
@@ -150,14 +153,12 @@ class StreamVideo(Process):
 if __name__ == '__main__':
 
     """--------------PRODUCTION--------------"""
-    # DELETE FRAME TOPIC, TO AVOID USING PREVIOUS JUNK DATA
-    # clear_frame_topic(frame_topic=DL)
 
     # GET IPs OF CAMERAS
     if DL != "mnist":
         use_cv2 = False
         mnist = False
-        CAMERA_URLS = [get_video_feed_url(i, FPS) for i in [0, 1, 2, 3, 4, 5]]
+        CAMERA_URLS = [get_video_feed_url(i, folder=DL) for i in [0, 1]]
     else:
         use_cv2 = True
         mnist = True
@@ -187,4 +188,3 @@ if __name__ == '__main__':
 
     for p in PRODUCERS:
         p.join()
-
