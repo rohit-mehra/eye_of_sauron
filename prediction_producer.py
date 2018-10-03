@@ -180,7 +180,7 @@ if __name__ == '__main__':
     HM_PROCESSESS = 1
     CONSUMERS = [ConsumeFrames(frame_topic=FRAME_TOPIC,
                                query_faces_topic=KNOWN_FACE_TOPIC,
-                               scale=0.5) for _ in
+                               scale=1) for _ in
                  range(HM_PROCESSESS)]
 
     for c in CONSUMERS:

@@ -30,7 +30,7 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
             frame_number = 0
             original_frame, predicted_frame = bytes(0), bytes(0)
             try:
-                raw_messages = msg_stream.poll(timeout_ms=1000, max_records=200)
+                raw_messages = msg_stream.poll(timeout_ms=1000, max_records=60)
 
                 for topic_partition, msgs in raw_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame

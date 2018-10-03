@@ -20,7 +20,7 @@ from params import *
 
 clear_prediction_topics()
 
-BUFFER_SIZE = 180
+BUFFER_SIZE = 900
 BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()
@@ -62,10 +62,10 @@ broadcast_known_faces = KafkaProducer(bootstrap_servers=['localhost:9092'],
 def cam(cam_num):
     # return a multipart response
     if THREADED_BUFFER_CONCEPT:
-        return Response(consume_buffer(int(cam_num), BUFFER_DICT, DATA_DICT, EVENT_THREADS, LOCK),
+        return Response(consume_buffer(int(cam_num), BUFFER_DICT, DATA_DICT, EVENT_THREADS, LOCK, buffer_size=BUFFER_SIZE),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
 
-    return Response(consumer(int(cam_num), BUFFER_DICT, DATA_DICT),
+    return Response(consumer(int(cam_num), BUFFER_DICT, DATA_DICT, buffer_size=BUFFER_SIZE),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
