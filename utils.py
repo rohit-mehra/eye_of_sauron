@@ -4,7 +4,7 @@ import time
 from heapq import heappush, heappop
 
 import cv2
-import wget
+import numpy as np
 from kafka import KafkaConsumer
 
 from params import *
@@ -12,9 +12,9 @@ from params import *
 
 def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
     """Generator to yield frames from the respective camera.
-    :param buffer_size:
-    :param data_dict:
-    :param buffer_dict:
+    :param buffer_size: Buffer Size
+    :param data_dict: Data Stored here, buffer only stores keys
+    :param buffer_dict: Collection of buffers for different cameras
     :param cam_num: camera number.
     """
 
@@ -30,7 +30,7 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
             frame_number = 0
             original_frame, predicted_frame = bytes(0), bytes(0)
             try:
-                raw_messages = msg_stream.poll(timeout_ms=1000, max_records=30)
+                raw_messages = msg_stream.poll(timeout_ms=1000, max_records=200)
 
                 for topic_partition, msgs in raw_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame
@@ -55,10 +55,7 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
                 if len(buffer_dict[cam_num]) >= buffer_size:
                     print("[CAM {}][PART 2] YIELD".format(cam_num))
 
-                    if DL == "mnist":
-                        time.sleep(0.5)
-                    else:
-                        time.sleep(0.03)
+                    time.sleep(0.01)
 
                     last_frame_num = frame_number
 
@@ -92,31 +89,28 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
 
 
 def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_size=180):
-    """Generator to yield frames from the respective camera.
-    :param buffer_size:
-    :param lock:
-    :param event_threads:
-    :param data_dict:
-    :param buffer_dict:
+    """Generator to yield frames from the respective camera. Threaded Concept.
+    :param buffer_size: Buffer Size
+    :param lock: To ensure no deadlock while accessing buffer, as in population and consumption
+    :param event_threads: To set specific consumption event, when specific buffer is full, specific to camera/stream
+    :param data_dict: Data Stored here, buffer only stores keys
+    :param buffer_dict: Collection of buffers for different cameras
     :param cam_num: camera number.
     """
-    # print log
+    # Print log
     print(
         "\n[CAM {}][FLASK] Waiting for buffer to fill..[{}/{}]".format(cam_num, len(buffer_dict[cam_num]), buffer_size))
     event_threads[cam_num].wait()
 
-    # start consumption event as soon as the buffer hits the threshold.
+    # Start consumption event as soon as the buffer hits the threshold.
     print("\n\n[CAM {}][FLASK] Pushing to Flask..".format(cam_num))
-    # init variables
+    # Init variables
     frame_number = 0
     original_frame, predicted_frame = bytes(0), bytes(0)
 
     while True:
-        if DL == "mnist":
-            time.sleep(0.5)
-        else:
-            time.sleep(0.03)
-
+        time.sleep(0.02)
+        # Acquire sync lock, prevents deadlock and maintains consistency
         lock.acquire()
         last_frame_num = frame_number
         if len(buffer_dict[cam_num]):
@@ -139,10 +133,10 @@ def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_
 
 def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, buffer_size=180):
     """Fills the heap buffer, sets of an event to display as soon as set buffer limit hits.
-    :param buffer_size:
-    :param event_threads:
-    :param data_dict:
-    :param buffer_dict:
+    :param buffer_size: Buffer Size
+    :param event_threads: To set specific consumption event, when specific buffer is full, specific to camera/stream
+    :param data_dict: Data Stored here, buffer only stores keys
+    :param buffer_dict: Collection of buffers for different cameras
     :param msg_stream: message stream from respective camera topic, topic in format [PREDICTION_TOPIC_PREFIX]_[cam_num]
     :param cam_num: camera number, used to access respective buffer, or data
     """
@@ -204,6 +198,11 @@ def get_png(prediction_obj):
 
 
 def clear_frame_topic(frame_topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
+    """Util function to clear frame topic.
+    :param partitions:
+    :param frame_topic:
+    """
+
     os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}".format(frame_topic))
     # SETTING UP TOPIC WITH DESIRED PARTITIONS
     init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 " \
@@ -224,11 +223,16 @@ def clear_frame_topic(frame_topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
 
 
 def clear_known_face_topic():
+    """Util function to clear known face broadcasting topic."""
     os.system(
         "/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}".format(KNOWN_FACE_TOPIC))
 
 
-def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX, ):
+def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX):
+    """Clear prediction topics. Specific to Camera Number.
+    :param prediction_prefix: Just a stamp for this class of topics
+    """
+
     for i in range(TOTAL_CAMERAS + 1, 0, -1):
         print()
         # DELETE PREDICTION TOPICs, TO AVOID USING PREVIOUS JUNK DATA
@@ -236,77 +240,27 @@ def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX, ):
             prediction_prefix, i))
 
 
-def check_or_get_file(file_path, file_name):
-    if not os.path.isfile(file_path):
-        print("[DOWNLOADING] to file_path")
-        url = C_FRONT_ENDPOINT + file_name
-        wget.download(url, file_path)
-
-    print("[INFO]{} present..".format(file_path))
-
-
-def get_model_proto(target):
-    if target == "object_detection":
-        check_or_get_file(OD_MODEL_PATH, OD_MODEL_NAME)
-        check_or_get_file(OD_PROTO_PATH, OD_PROTO_NAME)
-        check_or_get_file(LABEL_PATH, LABEL_NAME)
-        return OD_MODEL_PATH, OD_PROTO_PATH, None
-
-    if target == "image_classification":
-        check_or_get_file(MODEL_PATH, MODEL_NAME)
-        check_or_get_file(PROTO_PATH, PROTO_NAME)
-        check_or_get_file(LABEL_PATH, LABEL_NAME)
-        return MODEL_PATH, PROTO_PATH, LABEL_PATH
-
-    if target == "mnist":
-        check_or_get_file(M_MODEL_PATH, M_MODEL_NAME)
-        return M_MODEL_PATH, None, None
-
-
 def np_to_json(obj, prefix_name=''):
-    """Serialize numpy.ndarray obj"""
+    """Serialize numpy.ndarray obj
+    :param prefix_name: unique name for this array.
+    :param obj: numpy.ndarray"""
     return {'{}_frame'.format(prefix_name): base64.b64encode(obj.tostring()).decode("utf-8"),
             '{}_dtype'.format(prefix_name): obj.dtype.str,
             '{}_shape'.format(prefix_name): obj.shape}
 
 
 def np_from_json(obj, prefix_name=''):
-    """Deserialize numpy.ndarray obj"""
+    """Deserialize numpy.ndarray obj
+    :param prefix_name: unique name for this array.
+    :param obj: numpy.ndarray"""
     return np.frombuffer(base64.b64decode(obj['{}_frame'.format(prefix_name)].encode("utf-8")),
                          dtype=np.dtype(obj['{}_dtype'.format(prefix_name)])).reshape(
         obj['{}_shape'.format(prefix_name)])
 
 
-def np_to_json_v2(obj):
-    """Serialize numpy.ndarray obj"""
-    return {'frame': obj.tostring().decode("latin1"),
-            'dtype': obj.dtype.str,
-            'shape': obj.shape}
-
-
-def np_from_json_v2(obj):
-    """Deserialize numpy.ndarray obj"""
-    return np.frombuffer(obj['frame'].encode("latin1"),
-                         dtype=np.dtype(obj['dtype'])
-                         ).reshape(obj['shape'])
-
-
 def get_video_feed_url(camera_num=0, folder="videos"):
     """Get CAMERA IP from where video is being streamed.
-    Returns:
-        A URL to the stream.
+    :returns A URL to the stream.
     """
     # serving from s3 bucket via cloudFront: url to the object
     return C_FRONT_ENDPOINT + "{}/{}.mp4".format(folder, camera_num)
-
-
-def get_mnist_feed_url(camera_num=0, fps=2):
-    """Get CAMERA IP from where video is being streamed.
-    Args:
-        camera_num: camera number
-        fps: fps os stream
-    Returns:
-        A URL to the stream.
-    """
-    # serving from s3 bucket via cloudFront: url to the object
-    return C_FRONT_ENDPOINT + "mvideos/cam{}_{}_fps.mp4".format(camera_num, fps)

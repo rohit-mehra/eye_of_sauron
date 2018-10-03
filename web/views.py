@@ -6,6 +6,7 @@ from collections import defaultdict
 
 import cv2
 import face_recognition
+import numpy as np
 from flask import Response, render_template, request, url_for, redirect, session
 from flask_dropzone import Dropzone
 from flask_uploads import UploadSet, configure_uploads, IMAGES, patch_request_class
@@ -14,17 +15,19 @@ from kafka import KafkaConsumer, KafkaProducer
 from web import app
 
 sys.path.insert(0, '..')
-from utils import populate_buffer, consume_buffer, consumer, np_to_json
+from utils import populate_buffer, consume_buffer, consumer, np_to_json, clear_prediction_topics
 from params import *
+
+clear_prediction_topics()
 
 BUFFER_SIZE = 180
 BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()
 EVENT_THREADS = dict()
-BUFFER = False
+THREADED_BUFFER_CONCEPT = False  # Use
 
-save_dir = os.getcwd() + '/data/query_faces'
+save_dir = os.getcwd() + '/data/faces'
 
 if os.path.isdir(save_dir):
     shutil.rmtree(save_dir)
@@ -36,7 +39,7 @@ print(save_dir)
 
 dropzone = Dropzone(app)
 
-app.config['SECRET_KEY'] = 'supersecretkeygoeshere'
+app.config['SECRET_KEY'] = 'dupersecretkeygoeshere'
 
 # Dropzone settings
 app.config['DROPZONE_UPLOAD_MULTIPLE'] = True
@@ -45,7 +48,7 @@ app.config['DROPZONE_ALLOWED_FILE_TYPE'] = 'image/*'
 app.config['DROPZONE_REDIRECT_VIEW'] = 'results'
 
 # Uploads settings
-app.config['UPLOADED_PHOTOS_DEST'] = os.getcwd() + '/data/query_faces'
+app.config['UPLOADED_PHOTOS_DEST'] = save_dir
 
 photos = UploadSet('photos', IMAGES)
 configure_uploads(app, photos)
@@ -58,7 +61,7 @@ broadcast_known_faces = KafkaProducer(bootstrap_servers=['localhost:9092'],
 @app.route('/cam/<cam_num>')
 def cam(cam_num):
     # return a multipart response
-    if BUFFER:
+    if THREADED_BUFFER_CONCEPT:
         return Response(consume_buffer(int(cam_num), BUFFER_DICT, DATA_DICT, EVENT_THREADS, LOCK),
                         mimetype='multipart/x-mixed-replace; boundary=frame')
 
@@ -73,23 +76,21 @@ def get_cameras(camera_numbers):
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    # Start Point, Empty Directory
-    shutil.rmtree(save_dir)
-    os.makedirs(save_dir)
-
     # set session for image results
-    if "file_urls" not in session:
-        session['file_urls'] = []
-        session['known_face_names'] = []
+    session['file_urls'] = [] if 'file_urls' not in session else session['file_urls']
+    session['known_faces'] = [] if 'known_faces' not in session else session['known_faces']
+    session['known_face_encodings'] = [] if 'known_face_encodings' not in session else session['known_face_encodings']
+    session['image_file_names'] = [] if 'image_file_names' not in session else session['image_file_names']
 
     # list to hold our uploaded image urls
     file_urls = session['file_urls']
-    known_face_names = session['known_face_names']
-    known_face_encodings = []
-    image_file_names = []
+    known_faces = session['known_faces']
+    known_face_encodings = session['known_face_encodings']
+    image_file_names = session['image_file_names']
 
     # handle image upload from Dropszone
     if request.method == 'POST':
+
         file_obj = request.files
 
         # COLLECT TARGET FACE NAMES AND ENCODINGS
@@ -101,73 +102,40 @@ def index():
                 file,
                 name=file.filename
             )
+
+            # append image name
             image_file_names.append(filename)
+            # append image url
+            file_urls.append(photos.url(filename))
 
             file_path = "{}/{}".format(save_dir, filename)
             # Load a picture and learn how to recognize it.
             image = face_recognition.load_image_file(file_path)
 
             # Get encoding, out of all the first one, assumption just one face in the query image
-            image_encoding = face_recognition.face_encodings(image)[0]
-            # append image encoding
-            known_face_encodings.append(image_encoding)
-            # append image name
-            known_face_names.append(filename[:filename.index(".")].title())
-            # append image url
-            file_urls.append(photos.url(filename))
+            image_encoding = face_recognition.face_encodings(image, num_jitters=18)[0]
 
-        # print(np.array(known_face_encodings), np.array(known_face_names))
-        # print(np.array(known_face_encodings).shape, np.array(known_face_names).shape)
+            # append image encoding in string
+            known_face_encodings.append(json.dumps(image_encoding.tolist()))
 
-        # TODO: BROADCAST THE TARGET TO LOOK FOR:
-        broadcast_message = np_to_json(np.array(known_face_encodings), prefix_name="known_face_encodings")
-        broadcast_message.update(np_to_json(np.array(known_face_names), prefix_name="known_face_names"))
-        broadcast_known_faces.send(KNOWN_FACE_TOPIC, value=broadcast_message)
+            # get face name from filename
+            dot_idx = filename.index(".")
+            try:
+                underscore_idx = filename.index("_")
+            except ValueError:
+                underscore_idx = len(filename)
 
-        # DISPLAY
-        face_locations = []  # collect found face location
-        face_encodings = []
-        face_names = []  # collect found face names
+            to_idx = dot_idx if dot_idx < underscore_idx else underscore_idx
+            face_name = filename[:to_idx]
 
-        # loop over uploaded images, in reality loop over test images or frames
-        for filename in image_file_names:
-
-            file_path = "{}/{}".format(save_dir, filename)
-            image = face_recognition.load_image_file(file_path)
-
-            # Find all the faces and face encodings in the current frame of video
-            face_locations = face_recognition.face_locations(image)
-            face_encodings = face_recognition.face_encodings(image, face_locations)
-
-            # faces found in this image
-            face_names = []
-            for face_encoding in face_encodings:
-                # See if the face is a match for the known face(s)
-                matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-                name = "Unknown"
-
-                # If a match was found in known_face_encodings, just use the first one.
-                if True in matches:
-                    first_match_index = matches.index(True)
-                    name = known_face_names[first_match_index]
-
-                face_names.append(name.title())
-
-            # SAVE the results for this frame
-            for (top, right, bottom, left), name in zip(face_locations, face_names):
-                # Draw a box around the face
-                cv2.rectangle(image, (left, top), (right, bottom), (0, 0, 255), 2)
-
-                # Draw a label with a name below the face
-                cv2.rectangle(image, (left, bottom - 27), (right, bottom), (0, 0, 255), cv2.FILLED)
-                font = cv2.FONT_HERSHEY_DUPLEX
-                cv2.putText(image, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
-
-            cv2.imwrite(file_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            known_faces.append(face_name.title())
 
         session['file_urls'] = file_urls
-        session['known_face_names'] = known_face_names
-        return "uploading..."
+        session['known_faces'] = known_faces
+        session['known_face_encodings'] = known_face_encodings
+        session['image_file_names'] = image_file_names
+
+        return "Uploading..."
 
     # show the form, if wasn't submitted
     return render_template('index.html')
@@ -180,27 +148,77 @@ def results():
         return redirect(url_for('get_cameras', camera_numbers=camera_numbers), code=302)
 
     # redirect to home if no images to display
-    if "file_urls" not in session or session['file_urls'] == []:
-        return redirect(url_for('index'))
+    if 'file_urls' not in session or session['file_urls'] == []:
+        return redirect(url_for('index'), code=302)
+
+    # redirect to home if no images to display
+    if 'known_faces' not in session or session['known_faces'] == []:
+        return redirect(url_for('index'), code=302)
 
     # set the file_urls and remove the session variable
     file_urls = session['file_urls']
-    known_face_names = session['known_face_names']
+    known_faces = session['known_faces']
+    known_face_encodings = [np.array(json.loads(kfe)) for kfe in session['known_face_encodings']]
+    image_file_names = session['image_file_names']
+
+    # print(np.array(known_face_encodings), np.array(known_faces))
+    # print(np.array(known_face_encodings).shape, np.array(known_faces).shape)
+    print('\n', known_faces, '\n')
+    # TODO: BROADCAST THE TARGET TO LOOK FOR:
+    broadcast_message = np_to_json(np.array(known_face_encodings),
+                                   prefix_name="known_face_encodings")
+    broadcast_message.update(np_to_json(np.array(known_faces), prefix_name="known_faces"))
+    broadcast_known_faces.send(KNOWN_FACE_TOPIC, value=broadcast_message)
+
+    # loop over uploaded images, in reality loop over test images or frames
+    for file_name in image_file_names:
+
+        file_path = "{}/{}".format(save_dir, file_name)
+
+        image = face_recognition.load_image_file(file_path)
+
+        # Find all the faces and face encodings in the current frame of video
+        face_locations = face_recognition.face_locations(image)
+        face_encodings = face_recognition.face_encodings(image, face_locations)
+
+        # faces found in this image
+        face_names = []
+        for face_encoding in face_encodings:
+            # See if the face is a match for the known face(s)
+            matches = face_recognition.compare_faces(known_face_encodings, face_encoding, tolerance=0.3)
+            name = "Unknown"
+
+            # If a match was found in known_face_encodings, just use the first one.
+            if True in matches:
+                first_match_index = matches.index(True)
+                name = known_faces[first_match_index]
+
+            face_names.append(name.title())
+
+        # SAVE the results for this frame
+        for (top, right, bottom, left), name in zip(face_locations, face_names):
+            # Draw a box around the face
+            cv2.rectangle(image, (left, top), (right, bottom), (0, 0, 255), 2)
+
+            # Draw a label with a name below the face
+            cv2.rectangle(image, (left, bottom - 27), (right, bottom), (0, 0, 255), cv2.FILLED)
+            font = cv2.FONT_HERSHEY_DUPLEX
+            cv2.putText(image, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+
+        cv2.imwrite(file_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+
     session.pop('file_urls', None)
-    session.pop('known_face_names', None)
+    session.pop('known_faces', None)
+    session.pop('known_face_encodings', None)
+    session.pop('image_file_names', None)
+    session.clear()
 
-    return render_template('results.html', file_urls_names=zip(file_urls, known_face_names))
+    return render_template('results.html', file_urls_names=zip(file_urls, known_faces))
 
 
-"""----------------------------CONSUMPTION----------------------------"""
-
-if BUFFER:
-
+if THREADED_BUFFER_CONCEPT:
     cam_nums = [i for i in range(1, TOTAL_CAMERAS + 1)]
     prediction_topics = {cam_num: "{}_{}".format(PREDICTION_TOPIC_PREFIX, cam_num) for cam_num in cam_nums}
-
-    print('\n', prediction_topics)
-
     prediction_consumers = {cam_num: KafkaConsumer(topic, group_id='view',
                                                    bootstrap_servers=['0.0.0.0:9092'],
                                                    auto_offset_reset='earliest',

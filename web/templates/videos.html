@@ -14,25 +14,17 @@
 
         <div class="col-lg-12"  align="center">
             <h1 class="page-header" align="center">The Eye of Sauron</h1>
-            <a href="{{ url_for('index') }}" class="btn btn-info btn-lg" >
+            <p><a href="{{ url_for('index') }}" class="btn btn-info btn-lg" >
                 <span class="glyphicon glyphicon-home" ></span> Home
-            </a>
+            </a></p>
         </div>
 
         {% for number in camera_numbers %}
-            <div class="col-lg-3 col-md-3 col-xs-6 thumb">
-                {#            <img class="img-responsive" src="http://52.71.27.48:3333/cam/{{number}}">#}
+            <div class="col-lg-4 col-md-4 col-xs-6 thumb">
                 <img class="img-responsive" src="{{ url_for("cam", cam_num=number) }}">
-
-                {#            <img class="img-responsive" src="https://s3.amazonaws.com/camera-data-eye/cat.jpg">#}
                 <em>CAMERA : {{ number }}</em>
             </div>
         {% endfor %}
-        {##}
-        {#         <div class="col-lg-3 col-md-4 col-xs-6 thumb">#}
-        {#            <img class="img-responsive" src="{{url_for("cam", cam_num=9)}}">#}
-        {#            <em>CAMERA : {{ number }}</em>#}
-        {#        </div>#}
 
     </div>
 </div>
@@ -43,16 +35,3 @@
 
 </body>
 </html>
-
-
-{#<html>#}
-{#  <head>#}
-{#    <title>Real Time Streaming</title>#}
-{#  </head>#}
-{#  <body>#}
-{#    <h1>The Eye of Sauron</h1>#}
-{#    {% for number in camera_numbers %}#}
-{#        <img src="{{ url_for("cam", cam_num=number)}}" width="120" height="120">#}
-{#    {% endfor %}#}
-{#  </body>#}
-{#</html>#}

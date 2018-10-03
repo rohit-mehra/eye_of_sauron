@@ -5,15 +5,16 @@ from multiprocessing import Process
 
 import cv2
 import imutils
+import numpy as np
 from imutils.video import VideoStream
 from kafka import KafkaProducer
 
-from params import *
-from utils import np_to_json, get_video_feed_url, get_mnist_feed_url
+from utils import np_to_json
 
 
 class StreamVideo(Process):
     """Video Streaming Producer Process Class."""
+
     def __init__(self, video_path,
                  topic,
                  topic_partitions=4,
@@ -104,9 +105,11 @@ class StreamVideo(Process):
                                                                                frame_num, part), end='')
             # Publish to specific partition
             frame_producer.send(self.frame_topic, key=frame_num, value=message, partition=part)
+
             # To reduce CPU usage create sleep time of 0.01 sec
             if self.mnist:
                 time.sleep(0.1)
+
             frame_num += 1
 
         # clear the capture
@@ -138,53 +141,13 @@ class StreamVideo(Process):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # (28, 28)
         else:
             # to a standard size for UI
-            frame = imutils.resize(frame, width=400)
+            frame = imutils.resize(frame, width=600, height=600)
 
         # serialize frame
         # frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
-        frame_dict = np_to_json(frame, prefix_name=object_key)
+        frame_dict = np_to_json(frame.astype(np.uint8), prefix_name=object_key)
         # Metadata for frame
         message = {"timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         # add frame and metadata related to frame
         message.update(frame_dict)
         return message
-
-
-if __name__ == '__main__':
-
-    """--------------PRODUCTION--------------"""
-
-    # GET IPs OF CAMERAS
-    if DL != "mnist":
-        use_cv2 = False
-        mnist = False
-        CAMERA_URLS = [get_video_feed_url(i, folder=DL) for i in [0, 1]]
-    else:
-        use_cv2 = True
-        mnist = True
-        CAMERA_URLS = [get_mnist_feed_url(i, 2) for i in range(TOTAL_CAMERAS, -1, -1)]
-
-    print(CAMERA_URLS)
-
-    # Init StreamVideo processes, these publish frames from respective camera to the same topic
-    PRODUCERS = [StreamVideo(url, FRAME_TOPIC, SET_PARTITIONS,
-                             use_cv2=use_cv2,
-                             mnist=mnist,
-                             verbose=True,
-                             pub_obj_key=ORIGINAL_PREFIX) for url in
-                 CAMERA_URLS]
-
-    cam_nums = list(reversed([p.camera_num for p in PRODUCERS]))
-
-    print('\n', cam_nums, '\n')
-
-    # Topic specific to camera, contains predicted frame of that camera.
-    prediction_topics = {cam_num: "{}_{}".format(PREDICTION_TOPIC_PREFIX, cam_num) for cam_num in cam_nums}
-
-    print('\n', prediction_topics, '\n')
-
-    for p in PRODUCERS:
-        p.start()
-
-    for p in PRODUCERS:
-        p.join()
