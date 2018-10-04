@@ -3,8 +3,8 @@
 data/*
 models/*
 scratches/*
-.idea/*
-real-time-object-detection/*
+.idea
+real-time-object-detection
 __pycache__
 .ipynb_checkpoints
 *.npy
