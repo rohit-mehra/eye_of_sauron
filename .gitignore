@@ -12,5 +12,7 @@ __pycache__
 
 # include
 !data/*.md
+!data/*.png
+!data/*.gif
 !data/query_faces
 !models/*.md

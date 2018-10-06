@@ -60,7 +60,7 @@ class ConsumeFrames(Process):
                 if self.verbose:
                     print("[CONSUMER {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
 
-                raw_frame_messages = frame_consumer.poll(timeout_ms=1000, max_records=30)
+                raw_frame_messages = frame_consumer.poll(timeout_ms=1, max_records=30)
 
                 for topic_partition, msgs in raw_frame_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame
@@ -117,22 +117,26 @@ class ConsumeFrames(Process):
 
         with timer("Face Finding"):
             # Find all the faces and face encodings in the current frame of video
-            face_locations = face_recognition.face_locations(rgb_small_frame)
-            face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+            with timer("Location in frame"):
+                face_locations = face_recognition.face_locations(rgb_small_frame)
+            with timer("Encodings in frame"):
+                face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
             # Faces found in this image
             face_names = []
-            for face_encoding in face_encodings:
-                # See if the face is a match for the known face(s)
-                matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-                name = "Unknown"
+            with timer("Total Match time"):
+                for i, face_encoding in enumerate(face_encodings):
+                    # See if the face is a match for the known face(s)
+                    with timer("Match {}th face time".format(i)):
+                        matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
 
-                # If a match was found in known_face_encodings, just use the first one.
-                if True in matches:
-                    first_match_index = matches.index(True)
-                    name = known_faces[first_match_index]
+                    name = "Unknown"
+                    # If a match was found in known_face_encodings, just use the first one.
+                    if True in matches:
+                        first_match_index = matches.index(True)
+                        name = known_faces[first_match_index]
 
-                face_names.append(name.title())
+                    face_names.append(name.title())
 
             # Mark the results for this frame
             for (top, right, bottom, left), name in zip(face_locations, face_names):
@@ -177,7 +181,7 @@ def timer(name):
 
 if __name__ == '__main__':
 
-    HM_PROCESSESS = 1
+    HM_PROCESSESS = 2
     CONSUMERS = [ConsumeFrames(frame_topic=FRAME_TOPIC,
                                query_faces_topic=KNOWN_FACE_TOPIC,
                                scale=1) for _ in
