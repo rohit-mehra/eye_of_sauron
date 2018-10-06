@@ -1,5 +1,6 @@
 # exclude
 
+copy_to_remote.sh
 data/*
 models/*
 scratches/*
