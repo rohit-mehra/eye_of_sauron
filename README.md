@@ -28,14 +28,18 @@
 ## Key Features
 
 -   Scalable - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node.
--   Stream Processing in Python - Kafka Stream Processing API not yet available in Python
+-   Stream Processing in Python - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala.
 -   Modular approach - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
 
 ## How To Use
 
 To clone and run this application, you'll need [Git](https://git-scm.com), [python3](https://www.python.org/downloads/) (also install  [pip](https://docs.python.org/3/installing/index.html)) and kafka (v1.0.0 and v1.1.0 with scala v2.11 and v2.12) (all combinations) installed on your cluster. I used [Pegasus](https://github.com/InsightDataScience/pegasus) for the cluster setup on aws with [environment setup](https://github.com/InsightDataScience/pegasus/blob/master/install/environment/install_env.sh) modified to [this custom setup file](/cluster_setup/install_env.sh).
 
-Assuming all the environment is setup as per the instructions from above
+-   Setup Environment as per the commands from [this custom setup file](/cluster_setup/install_env.sh).
+-   Install [zookeeper- 3.4.13](https://s3-us-west-2.amazonaws.com/insight-tech/zookeeper/zookeeper-3.4.13.tar.gz)
+-   Install [kafka-1.1.0 for scala-2.12](https://s3-us-west-2.amazonaws.com/insight-tech/kafka/kafka_2.12-1.1.0.tar.gz)
+-   Start zookeeper service
+-   Start kafka service
 
 1.  From your command line (For web app and getting feeds from the camera):
 
@@ -78,8 +82,6 @@ $ sudo pip3 install -r requirements.txt
 # Run consumers
 $ python3 prediction_producer.py
 ```
-
-## Download
 
 ## Credits
 
