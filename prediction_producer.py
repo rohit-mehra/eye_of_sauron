@@ -6,8 +6,9 @@ from multiprocessing import Process
 
 import cv2
 import face_recognition
-from kafka import KafkaConsumer, KafkaProducer
 import numpy as np
+from kafka import KafkaConsumer, KafkaProducer
+
 from params import *
 from utils import np_from_json, np_to_json
 
@@ -22,7 +23,7 @@ class ConsumeFrames(Process):
                  target=None,
                  name=None,
                  scale=1.0,
-                 verbose=True):
+                 verbose=False):
         super().__init__(group=group, target=target, name=name)
 
         self.iam = "{}-{}".format(socket.gethostname(), self.name)
@@ -30,6 +31,7 @@ class ConsumeFrames(Process):
         self.query_faces_topic = query_faces_topic
         self.verbose = verbose
         self.scale = scale
+        self.frames_detection_collection = dict()
         print("[INFO] I am ", self.iam)
 
     def run(self):
@@ -60,7 +62,7 @@ class ConsumeFrames(Process):
                 if self.verbose:
                     print("[CONSUMER {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
 
-                raw_frame_messages = frame_consumer.poll(timeout_ms=1, max_records=30)
+                raw_frame_messages = frame_consumer.poll(timeout_ms=5, max_records=30)
 
                 for topic_partition, msgs in raw_frame_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame
@@ -99,7 +101,7 @@ class ConsumeFrames(Process):
             A dict with modified frame, i.e. bounded box drawn around detected persons face.
         """
 
-        with timer("Pseudo Work"):
+        with timer("*Pseudo Work*"):
             frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
             # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
             frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
@@ -115,10 +117,11 @@ class ConsumeFrames(Process):
                                                 prefix_name="known_face_encodings").tolist()  # (n, 128)
             known_faces = np_from_json(query_faces_data, prefix_name="known_faces").tolist()  # (n, )
 
-        with timer("Face Finding"):
+        with timer("*FACE RECOGNITION*"):
             # Find all the faces and face encodings in the current frame of video
-            with timer("Location in frame"):
+            with timer("Locations in frame"):
                 face_locations = face_recognition.face_locations(rgb_small_frame)
+
             with timer("Encodings in frame"):
                 face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 

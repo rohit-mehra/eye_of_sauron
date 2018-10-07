@@ -1,5 +1,6 @@
 import json
 import re
+import sys
 import time
 from multiprocessing import Process
 
@@ -17,7 +18,7 @@ class StreamVideo(Process):
 
     def __init__(self, video_path,
                  topic,
-                 topic_partitions=4,
+                 topic_partitions=8,
                  use_cv2=False,
                  mnist=False,
                  pub_obj_key='original',
@@ -95,7 +96,8 @@ class StreamVideo(Process):
                                      frame_num=frame_num,
                                      mnist=self.mnist,
                                      object_key=self.object_key,
-                                     camera=self.camera_num)
+                                     camera=self.camera_num,
+                                     verbose=self.verbose)
 
             # Partition to be sent to
             part = frame_num % self.topic_partitions
@@ -106,7 +108,7 @@ class StreamVideo(Process):
             # Publish to specific partition
             frame_producer.send(self.frame_topic, key=frame_num, value=message, partition=part)
 
-            # To reduce CPU usage create sleep time of 0.01 sec
+            # To reduce CPU usage create sleep time of 0.1 sec
             if self.mnist:
                 time.sleep(0.1)
 
@@ -124,7 +126,7 @@ class StreamVideo(Process):
         return True if frame_num > 0 else False
 
     @staticmethod
-    def transform(frame, frame_num, mnist=False, object_key='original', camera=0):
+    def transform(frame, frame_num, mnist=False, object_key='original', camera=0, verbose=False):
         """Serialize frame, create json message with serialized frame, camera number and timestamp.
         Args:
             frame: numpy.ndarray, raw frame
@@ -145,9 +147,13 @@ class StreamVideo(Process):
 
         # serialize frame
         # frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+        if verbose:
+            print("\nRAW ARRAY SIZE: ", sys.getsizeof(frame))
         frame_dict = np_to_json(frame.astype(np.uint8), prefix_name=object_key)
         # Metadata for frame
         message = {"timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         # add frame and metadata related to frame
         message.update(frame_dict)
+        if verbose:
+            print("\nMESSAGE SIZE: ", sys.getsizeof(message))
         return message
