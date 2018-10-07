@@ -8,7 +8,6 @@ import cv2
 import face_recognition
 import numpy as np
 from kafka import KafkaConsumer, KafkaProducer
-
 from params import *
 from utils import np_from_json, np_to_json
 
@@ -18,7 +17,8 @@ class ConsumeFrames(Process):
 
     def __init__(self,
                  frame_topic,
-                 query_faces_topic,
+                 processed_frame_topic,
+                 topic_partitions=SET_PARTITIONS,
                  group=None,
                  target=None,
                  name=None,
@@ -28,39 +28,135 @@ class ConsumeFrames(Process):
 
         self.iam = "{}-{}".format(socket.gethostname(), self.name)
         self.frame_topic = frame_topic
-        self.query_faces_topic = query_faces_topic
+
         self.verbose = verbose
         self.scale = scale
-        self.frames_detection_collection = dict()
+        self.topic_partitions= topic_partitions
+        self.processed_frame_topic = processed_frame_topic
         print("[INFO] I am ", self.iam)
 
     def run(self):
         """CONSUME video frames, predictions Published to respective camera topics"""
         # Connect to kafka, Consume frame obj bytes deserialize to json
-        frame_consumer = KafkaConsumer(self.frame_topic, group_id='predict', client_id=self.iam,
-                                       bootstrap_servers=['0.0.0.0:9092'],
+        frame_consumer = KafkaConsumer(self.frame_topic, group_id="consume", client_id=self.iam,
+                                       bootstrap_servers=["0.0.0.0:9092"],
                                        key_deserializer=lambda key: key.decode(),
                                        value_deserializer=lambda value: json.loads(value.decode()))
 
         #  Produces prediction object
-        prediction_producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
-                                            key_serializer=lambda key: str(key).encode(),
-                                            value_serializer=lambda value: json.dumps(value).encode())
-
-        # Consume known face object to know what faces are the target
-        query_faces_consumer = KafkaConsumer(self.query_faces_topic, group_id=self.iam, client_id=self.iam,
-                                             bootstrap_servers=['0.0.0.0:9092'],
-                                             value_deserializer=lambda value: json.loads(value.decode()))
-
-        print("[CONSUMER {}] WAITING FOR TRACKING INFO..".format(socket.gethostname()))
-        query_faces_message = next(query_faces_consumer)
-        print("[CONSUMER {}] GOT TRACKING INFO..".format(socket.gethostname()))
+        processed_frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
+                                                 key_serializer=lambda key: str(key).encode(),
+                                                 value_serializer=lambda value: json.dumps(value).encode())
 
         try:
             while True:
 
                 if self.verbose:
-                    print("[CONSUMER {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
+                    print("[ConsumeFrames {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
+
+                raw_frame_messages = frame_consumer.poll(timeout_ms=5, max_records=30)
+
+                for topic_partition, msgs in raw_frame_messages.items():
+                    # Get the predicted Object, JSON with frame and meta info about the frame
+                    for msg in msgs:
+                        result = self.get_processed_frame_object(msg.value, self.scale)
+                        # Partition to be sent to
+                        part = int(result["frame_num"]) % self.topic_partitions
+                        processed_frame_producer.send(self.processed_frame_topic, key=result["frame_num"],
+                                                      value=result, partition=part)
+
+        except KeyboardInterrupt as e:
+            print(e)
+            pass
+
+        finally:
+            print("Closing Stream")
+            frame_consumer.close()
+
+    @staticmethod
+    def get_processed_frame_object(frame_obj, scale=1.0):
+        """Processes value produced by producer, returns prediction with png image.
+        Args:
+            frame_obj: frame dictionary with frame information and frame itself
+            scale: (0, 1] scale image before face recognition, speeds up processing, decreases accuracy
+        Returns:
+            A dict updated with faces found in that frame, i.e. their location and encoding.
+        """
+
+        frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
+        # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+        frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+
+        if scale != 1:
+            # Resize frame of video to scale size for faster face recognition processing
+            rgb_small_frame = cv2.resize(frame, (0, 0), fx=scale, fy=scale)
+
+        else:
+            rgb_small_frame = frame
+
+        with timer("*PROCESS RAW FRAME {}*".format(frame_obj["frame_num"])):
+            # Find all the faces and face encodings in the current frame of video
+            with timer("Locations in frame"):
+                face_locations = np.array(face_recognition.face_locations(rgb_small_frame))
+                face_locations_dict = np_to_json(face_locations, prefix_name="face_locations")
+
+            with timer("Encodings in frame"):
+                face_encodings = np.array(face_recognition.face_encodings(rgb_small_frame, face_locations))
+                face_encodings_dict = np_to_json(face_encodings, prefix_name="face_encodings")
+
+        frame_obj.update(face_locations_dict)
+        frame_obj.update(face_encodings_dict)
+
+        return frame_obj
+
+
+class PredictFrames(Process):
+    """Consuming frame objects to, produce predictions."""
+
+    def __init__(self,
+                 processed_frame_topic,
+                 query_faces_topic,
+                 group=None,
+                 target=None,
+                 name=None,
+                 scale=1.0,
+                 verbose=False):
+        super().__init__(group=group, target=target, name=name)
+
+        self.iam = "{}-{}".format(socket.gethostname(), self.name)
+        self.frame_topic = processed_frame_topic
+        self.query_faces_topic = query_faces_topic
+        self.verbose = verbose
+        self.scale = scale
+        print("[INFO] I am ", self.iam)
+
+    def run(self):
+        """CONSUME video frames, predictions Published to respective camera topics"""
+        # Connect to kafka, Consume frame obj bytes deserialize to json
+        frame_consumer = KafkaConsumer(self.frame_topic, group_id="predict", client_id=self.iam,
+                                       bootstrap_servers=["0.0.0.0:9092"],
+                                       key_deserializer=lambda key: key.decode(),
+                                       value_deserializer=lambda value: json.loads(value.decode()))
+
+        #  Produces prediction object
+        prediction_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
+                                            key_serializer=lambda key: str(key).encode(),
+                                            value_serializer=lambda value: json.dumps(value).encode())
+
+        # Consume known face object to know what faces are the target
+        query_faces_consumer = KafkaConsumer(self.query_faces_topic, group_id=self.iam, client_id=self.iam,
+                                             bootstrap_servers=["0.0.0.0:9092"],
+                                             value_deserializer=lambda value: json.loads(value.decode()))
+
+        print("[PredictFrames {}] WAITING FOR TRACKING INFO..".format(socket.gethostname()))
+        query_faces_message = next(query_faces_consumer)
+        print("[PredictFrames {}] GOT TRACKING INFO..".format(socket.gethostname()))
+
+        try:
+            while True:
+
+                if self.verbose:
+                    print("[PredictFrames {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
 
                 raw_frame_messages = frame_consumer.poll(timeout_ms=5, max_records=30)
 
@@ -69,18 +165,17 @@ class ConsumeFrames(Process):
                     for msg in msgs:
                         result = self.get_face_object(msg.value, query_faces_message.value, self.scale)
 
-                        print("timestamp: {}, frame_num: {},camera_num: {}, latency: {}, y_hat: {}".format(
-                            result['timestamp'],
-                            result['frame_num'],
-                            result['camera'],
-                            result['latency'],
-                            result['prediction']
+                        print("frame_num: {},camera_num: {}, latency: {}, y_hat: {}".format(
+                            result["frame_num"],
+                            result["camera"],
+                            result["latency"],
+                            result["prediction"]
                         ))
 
                         # camera specific topic
-                        prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result['camera'])
+                        prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result["camera"])
 
-                        prediction_producer.send(prediction_topic, key=result['frame_num'], value=result)
+                        prediction_producer.send(prediction_topic, key=result["frame_num"], value=result)
 
         except KeyboardInterrupt as e:
             print(e)
@@ -100,30 +195,20 @@ class ConsumeFrames(Process):
         Returns:
             A dict with modified frame, i.e. bounded box drawn around detected persons face.
         """
+        # get frame from message
+        frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
+        # get processed info from message
+        face_locations = np_from_json(frame_obj, prefix_name="face_locations")
+        face_encodings = np_from_json(frame_obj, prefix_name="face_encodings")
+        # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+        frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
 
-        with timer("*Pseudo Work*"):
-            frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
-            # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-            frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+        # get info entered by user through UI
+        known_face_encodings = np_from_json(query_faces_data,
+                                            prefix_name="known_face_encodings").tolist()  # (n, 128)
+        known_faces = np_from_json(query_faces_data, prefix_name="known_faces").tolist()  # (n, )
 
-            if scale != 1:
-                # Resize frame of video to scale size for faster face recognition processing
-                rgb_small_frame = cv2.resize(frame, (0, 0), fx=scale, fy=scale)
-
-            else:
-                rgb_small_frame = frame
-
-            known_face_encodings = np_from_json(query_faces_data,
-                                                prefix_name="known_face_encodings").tolist()  # (n, 128)
-            known_faces = np_from_json(query_faces_data, prefix_name="known_faces").tolist()  # (n, )
-
-        with timer("*FACE RECOGNITION*"):
-            # Find all the faces and face encodings in the current frame of video
-            with timer("Locations in frame"):
-                face_locations = face_recognition.face_locations(rgb_small_frame)
-
-            with timer("Encodings in frame"):
-                face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+        with timer("\nFACE RECOGNITION\n"):
 
             # Faces found in this image
             face_names = []
@@ -166,7 +251,7 @@ class ConsumeFrames(Process):
 
         result = {"prediction": prediction,
                   "predict_time": str(time.time()),
-                  "latency": str(time.time() - int(frame_obj['timestamp']))}
+                  "latency": str(time.time() - int(frame_obj["timestamp"]))}
 
         frame_obj.update(frame_dict)  # update frame with prediction
         result.update(frame_obj)  # add prediction results
@@ -179,19 +264,31 @@ def timer(name):
     """Util function: Logs the time."""
     t0 = time.time()
     yield
-    print('[{}] done in {:.3f} s'.format(name, time.time() - t0))
+    print("[{}] done in {:.3f} s".format(name, time.time() - t0))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
-    HM_PROCESSESS = 2
-    CONSUMERS = [ConsumeFrames(frame_topic=FRAME_TOPIC,
-                               query_faces_topic=KNOWN_FACE_TOPIC,
-                               scale=1) for _ in
-                 range(HM_PROCESSESS)]
+    HM_PROCESSESS = 1
+    CONSUME_FRAMES = [ConsumeFrames(frame_topic=FRAME_TOPIC,
+                                    processed_frame_topic=PROCESSED_FRAME_TOPIC,
+                                    scale=1) for _ in
+                      range(HM_PROCESSESS)]
 
-    for c in CONSUMERS:
+    PREDICT_FRAMES = [PredictFrames(processed_frame_topic=PROCESSED_FRAME_TOPIC,
+                                    query_faces_topic=KNOWN_FACE_TOPIC,
+                                    scale=1) for _ in
+                      range(HM_PROCESSESS)]
+
+    for p in PREDICT_FRAMES:
+        p.start()
+
+    for c in CONSUME_FRAMES:
         c.start()
 
-    for c in CONSUMERS:
+    for c in CONSUME_FRAMES:
         c.join()
+
+    for p in PREDICT_FRAMES:
+        p.join()
+

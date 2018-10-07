@@ -14,7 +14,7 @@ from kafka import KafkaConsumer, KafkaProducer
 
 from web import app
 
-sys.path.insert(0, '..')
+sys.path.insert(0, "..")
 from utils import populate_buffer, consume_buffer, consumer, np_to_json, clear_prediction_topics
 from params import *
 
@@ -27,7 +27,7 @@ BUFFER_THREADS = dict()
 EVENT_THREADS = dict()
 THREADED_BUFFER_CONCEPT = False  # Use
 
-save_dir = os.getcwd() + '/data/faces'
+save_dir = os.getcwd() + "/data/faces"
 
 if os.path.isdir(save_dir):
     shutil.rmtree(save_dir)
@@ -39,57 +39,57 @@ print(save_dir)
 
 dropzone = Dropzone(app)
 
-app.config['SECRET_KEY'] = 'dupersecretkeygoeshere'
+app.config["SECRET_KEY"] = "dupersecretkeygoeshere"
 
 # Dropzone settings
-app.config['DROPZONE_UPLOAD_MULTIPLE'] = True
-app.config['DROPZONE_ALLOWED_FILE_CUSTOM'] = True
-app.config['DROPZONE_ALLOWED_FILE_TYPE'] = 'image/*'
-app.config['DROPZONE_REDIRECT_VIEW'] = 'results'
+app.config["DROPZONE_UPLOAD_MULTIPLE"] = True
+app.config["DROPZONE_ALLOWED_FILE_CUSTOM"] = True
+app.config["DROPZONE_ALLOWED_FILE_TYPE"] = "image/*"
+app.config["DROPZONE_REDIRECT_VIEW"] = "results"
 
 # Uploads settings
-app.config['UPLOADED_PHOTOS_DEST'] = save_dir
+app.config["UPLOADED_PHOTOS_DEST"] = save_dir
 
-photos = UploadSet('photos', IMAGES)
+photos = UploadSet("photos", IMAGES)
 configure_uploads(app, photos)
 patch_request_class(app)  # set maximum file size, default is 16MB
 
-broadcast_known_faces = KafkaProducer(bootstrap_servers=['localhost:9092'],
+broadcast_known_faces = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                       value_serializer=lambda value: json.dumps(value).encode())
 
 
-@app.route('/cam/<cam_num>')
+@app.route("/cam/<cam_num>")
 def cam(cam_num):
     # return a multipart response
     if THREADED_BUFFER_CONCEPT:
         return Response(consume_buffer(int(cam_num), BUFFER_DICT, DATA_DICT, EVENT_THREADS, LOCK, buffer_size=BUFFER_SIZE),
-                        mimetype='multipart/x-mixed-replace; boundary=frame')
+                        mimetype="multipart/x-mixed-replace; boundary=frame")
 
     return Response(consumer(int(cam_num), BUFFER_DICT, DATA_DICT, buffer_size=BUFFER_SIZE),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
-@app.route('/cameras/<camera_numbers>')
+@app.route("/cameras/<camera_numbers>")
 def get_cameras(camera_numbers):
     return render_template("videos.html", camera_numbers=list(range(1, 1 + int(camera_numbers))))
 
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
     # set session for image results
-    session['file_urls'] = [] if 'file_urls' not in session else session['file_urls']
-    session['known_faces'] = [] if 'known_faces' not in session else session['known_faces']
-    session['known_face_encodings'] = [] if 'known_face_encodings' not in session else session['known_face_encodings']
-    session['image_file_names'] = [] if 'image_file_names' not in session else session['image_file_names']
+    session["file_urls"] = [] if "file_urls" not in session else session["file_urls"]
+    session["known_faces"] = [] if "known_faces" not in session else session["known_faces"]
+    session["known_face_encodings"] = [] if "known_face_encodings" not in session else session["known_face_encodings"]
+    session["image_file_names"] = [] if "image_file_names" not in session else session["image_file_names"]
 
     # list to hold our uploaded image urls
-    file_urls = session['file_urls']
-    known_faces = session['known_faces']
-    known_face_encodings = session['known_face_encodings']
-    image_file_names = session['image_file_names']
+    file_urls = session["file_urls"]
+    known_faces = session["known_faces"]
+    known_face_encodings = session["known_face_encodings"]
+    image_file_names = session["image_file_names"]
 
     # handle image upload from Dropszone
-    if request.method == 'POST':
+    if request.method == "POST":
 
         file_obj = request.files
 
@@ -130,40 +130,40 @@ def index():
 
             known_faces.append(face_name.title())
 
-        session['file_urls'] = file_urls
-        session['known_faces'] = known_faces
-        session['known_face_encodings'] = known_face_encodings
-        session['image_file_names'] = image_file_names
+        session["file_urls"] = file_urls
+        session["known_faces"] = known_faces
+        session["known_face_encodings"] = known_face_encodings
+        session["image_file_names"] = image_file_names
 
         return "Uploading..."
 
-    # show the form, if wasn't submitted
-    return render_template('index.html')
+    # show the form, if wasn"t submitted
+    return render_template("index.html")
 
 
-@app.route('/results', methods=['GET', 'POST'])
+@app.route("/results", methods=["GET", "POST"])
 def results():
-    if request.method == 'POST':
-        camera_numbers = int(request.form['camera_numbers'])
-        return redirect(url_for('get_cameras', camera_numbers=camera_numbers), code=302)
+    if request.method == "POST":
+        camera_numbers = int(request.form["camera_numbers"])
+        return redirect(url_for("get_cameras", camera_numbers=camera_numbers), code=302)
 
     # redirect to home if no images to display
-    if 'file_urls' not in session or session['file_urls'] == []:
-        return redirect(url_for('index'), code=302)
+    if "file_urls" not in session or session["file_urls"] == []:
+        return redirect(url_for("index"), code=302)
 
     # redirect to home if no images to display
-    if 'known_faces' not in session or session['known_faces'] == []:
-        return redirect(url_for('index'), code=302)
+    if "known_faces" not in session or session["known_faces"] == []:
+        return redirect(url_for("index"), code=302)
 
     # set the file_urls and remove the session variable
-    file_urls = session['file_urls']
-    known_faces = session['known_faces']
-    known_face_encodings = [np.array(json.loads(kfe)) for kfe in session['known_face_encodings']]
-    image_file_names = session['image_file_names']
+    file_urls = session["file_urls"]
+    known_faces = session["known_faces"]
+    known_face_encodings = [np.array(json.loads(kfe)) for kfe in session["known_face_encodings"]]
+    image_file_names = session["image_file_names"]
 
     # print(np.array(known_face_encodings), np.array(known_faces))
     # print(np.array(known_face_encodings).shape, np.array(known_faces).shape)
-    print('\n', known_faces, '\n')
+    print("\n", known_faces, "\n")
     # TODO: BROADCAST THE TARGET TO LOOK FOR:
     broadcast_message = np_to_json(np.array(known_face_encodings),
                                    prefix_name="known_face_encodings")
@@ -207,21 +207,21 @@ def results():
 
         cv2.imwrite(file_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-    session.pop('file_urls', None)
-    session.pop('known_faces', None)
-    session.pop('known_face_encodings', None)
-    session.pop('image_file_names', None)
+    session.pop("file_urls", None)
+    session.pop("known_faces", None)
+    session.pop("known_face_encodings", None)
+    session.pop("image_file_names", None)
     session.clear()
 
-    return render_template('results.html', file_urls_names=zip(file_urls, known_faces))
+    return render_template("results.html", file_urls_names=zip(file_urls, known_faces))
 
 
 if THREADED_BUFFER_CONCEPT:
     cam_nums = [i for i in range(1, TOTAL_CAMERAS + 1)]
     prediction_topics = {cam_num: "{}_{}".format(PREDICTION_TOPIC_PREFIX, cam_num) for cam_num in cam_nums}
-    prediction_consumers = {cam_num: KafkaConsumer(topic, group_id='view',
-                                                   bootstrap_servers=['0.0.0.0:9092'],
-                                                   auto_offset_reset='earliest',
+    prediction_consumers = {cam_num: KafkaConsumer(topic, group_id="view",
+                                                   bootstrap_servers=["0.0.0.0:9092"],
+                                                   auto_offset_reset="latest",
                                                    value_deserializer=lambda value: json.loads(value.decode()
                                                                                                )) for cam_num, topic in
                             prediction_topics.items()}

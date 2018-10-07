@@ -21,7 +21,7 @@ class StreamVideo(Process):
                  topic_partitions=8,
                  use_cv2=False,
                  mnist=False,
-                 pub_obj_key='original',
+                 pub_obj_key="original",
                  group=None,
                  target=None,
                  name=None,
@@ -35,7 +35,7 @@ class StreamVideo(Process):
         self.frame_topic = topic
         self.mnist = mnist
         self.topic_partitions = topic_partitions
-        self.camera_num = int(re.findall(r'StreamVideo-([0-9]*)', self.name)[0])
+        self.camera_num = int(re.findall(r"StreamVideo-([0-9]*)", self.name)[0])
         self.use_cv2 = use_cv2
         self.object_key = pub_obj_key
         self.verbose = verbose
@@ -44,17 +44,17 @@ class StreamVideo(Process):
         """Publish video frames as json objects, timestamped, marked with camera number.
         Source:
             self.video_path: URL for streaming video
-            self.kwargs['use_cv2']: use raw cv2 streaming, set to false to use smart fast streaming --> not every frame is sent.
+            self.kwargs["use_cv2"]: use raw cv2 streaming, set to false to use smart fast streaming --> not every frame is sent.
         Publishes:
-            A dict {'frame': string(base64encodedarray), 'dtype': obj.dtype.str, 'shape': obj.shape,
+            A dict {"frame": string(base64encodedarray), "dtype": obj.dtype.str, "shape": obj.shape,
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         """
 
-        frame_producer = KafkaProducer(bootstrap_servers=['localhost:9092'],
+        frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                        key_serializer=lambda key: str(key).encode(),
                                        value_serializer=lambda value: json.dumps(value).encode())
 
-        print('[CAM {}] URL: {}, TOPIC PARTITIONS: {}'.format(self.camera_num,
+        print("[CAM {}] URL: {}, TOPIC PARTITIONS: {}".format(self.camera_num,
                                                               self.video_path,
                                                               frame_producer.partitions_for(
                                                                   self.frame_topic)))
@@ -64,7 +64,7 @@ class StreamVideo(Process):
         # Track frame number
         frame_num = 0
         start_time = time.time()
-        print('[CAM {}] START TIME {}: '.format(self.camera_num, start_time))
+        print("[CAM {}] START TIME {}: ".format(self.camera_num, start_time))
 
         # Read URL, Transform, Publish
         while True:
@@ -75,7 +75,7 @@ class StreamVideo(Process):
                 # check if the file has read
                 if not success:
                     if self.verbose:
-                        print('[CAM {}] URL: {}, END FRAME: {}'.format(self.name,
+                        print("[CAM {}] URL: {}, END FRAME: {}".format(self.name,
                                                                        self.video_path,
                                                                        frame_num))
                     break
@@ -86,7 +86,7 @@ class StreamVideo(Process):
                 # check if the file has read
                 if image is None:
                     if self.verbose:
-                        print('[CAM {}] URL: {}, END FRAME: {}'.format(self.name,
+                        print("[CAM {}] URL: {}, END FRAME: {}".format(self.name,
                                                                        self.video_path,
                                                                        frame_num))
                     break
@@ -103,8 +103,8 @@ class StreamVideo(Process):
             part = frame_num % self.topic_partitions
             # Logging
             if self.verbose:
-                print("\r[PRODUCER][Cam {}] FRAME: {} TO PARTITION: {}".format(message['camera'],
-                                                                               frame_num, part), end='')
+                print("\r[PRODUCER][Cam {}] FRAME: {} TO PARTITION: {}".format(message["camera"],
+                                                                               frame_num, part), end="")
             # Publish to specific partition
             frame_producer.send(self.frame_topic, key=frame_num, value=message, partition=part)
 
@@ -121,12 +121,12 @@ class StreamVideo(Process):
             video.stop()
 
         if self.verbose:
-            print('[CAM {}] FINISHED. STREAM TIME {}: '.format(self.camera_num, time.time() - start_time))
+            print("[CAM {}] FINISHED. STREAM TIME {}: ".format(self.camera_num, time.time() - start_time))
 
         return True if frame_num > 0 else False
 
     @staticmethod
-    def transform(frame, frame_num, mnist=False, object_key='original', camera=0, verbose=False):
+    def transform(frame, frame_num, mnist=False, object_key="original", camera=0, verbose=False):
         """Serialize frame, create json message with serialized frame, camera number and timestamp.
         Args:
             frame: numpy.ndarray, raw frame
@@ -135,7 +135,7 @@ class StreamVideo(Process):
             camera: Camera Number the frame is from
             object_key: identifier for these objects
         Returns:
-            A dict {'frame': string(base64encodedarray), 'dtype': obj.dtype.str, 'shape': obj.shape,
+            A dict {"frame": string(base64encodedarray), "dtype": obj.dtype.str, "shape": obj.shape,
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         """
 

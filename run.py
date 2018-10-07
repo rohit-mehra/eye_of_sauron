@@ -4,13 +4,19 @@ import time
 
 from frame_producer import StreamVideo
 from params import *
-from utils import clear_frame_topic, clear_known_face_topic, get_video_feed_url
+from utils import clear_topic, set_topic, get_video_feed_url
 from web import app
 
 # Clear Broadcast topic, new query images to be used.
-clear_known_face_topic()
-# Clear frame topic
-clear_frame_topic(FRAME_TOPIC)
+clear_topic(KNOWN_FACE_TOPIC)
+# Clear raw frame topic
+clear_topic(FRAME_TOPIC)
+# Clear processed frame topic
+clear_topic(PROCESSED_FRAME_TOPIC)
+
+# set partitions
+set_topic(FRAME_TOPIC, 16)
+set_topic(PROCESSED_FRAME_TOPIC, 16)
 # Wait
 time.sleep(3)
 
@@ -31,7 +37,7 @@ for p in PRODUCERS:
 """--------------WEB APP--------------"""
 print("[MAIN]", CAMERA_URLS)
 
-app.run(host='0.0.0.0', debug=False, threaded=True, port=3333)
+app.run(host="0.0.0.0", debug=False, threaded=True, port=3333)
 
 for p in PRODUCERS:
     p.join()

@@ -19,9 +19,9 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
     """
 
     topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, cam_num)
-    msg_stream = KafkaConsumer(topic, group_id='view',
-                               bootstrap_servers=['0.0.0.0:9092'],
-                               auto_offset_reset='earliest',
+    msg_stream = KafkaConsumer(topic, group_id="view",
+                               bootstrap_servers=["0.0.0.0:9092"],
+                               auto_offset_reset="earliest",
                                value_deserializer=lambda value: json.loads(value.decode()
                                                                            ))
     try:
@@ -37,7 +37,7 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
                     for msg in msgs:
                         prediction_obj = msg.value
                         # frame cam_num
-                        frame_num = int(prediction_obj['frame_num'])
+                        frame_num = int(prediction_obj["frame_num"])
                         # extract images from the prediction message
                         original_png, predicted_png = get_png(prediction_obj)
 
@@ -46,10 +46,10 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
                         # DATA DICT: TO COLLECT REAL FRMAES
                         data_dict[cam_num][frame_num] = (original_png.tobytes(), predicted_png.tobytes())
                         # print log
-                        print('\r[CAM {}][PART 1][BUFFER] Pushed: {} {}/{}'.format(cam_num, prediction_obj['frame_num'],
+                        print("\r[CAM {}][PART 1][BUFFER] Pushed: {} {}/{}".format(cam_num, prediction_obj["frame_num"],
                                                                                    len(buffer_dict[cam_num]),
                                                                                    buffer_size),
-                              end='')
+                              end="")
 
                 # as soon as buffer is full for the first time, start consuming/display event on flask
                 if len(buffer_dict[cam_num]) >= buffer_size:
@@ -66,14 +66,14 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
                         original_frame, predicted_frame = data_dict[cam_num][frame_number]
 
                         yield (
-                                b'--frame\r\n'
-                                b'Content-Type: image/png\r\n\r\n' + predicted_frame + b'\r\n\r\n')
+                                b"--frame\r\n"
+                                b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
                     else:
                         print("[CAM {}] STREAM ENDED AT FRAME {}".format(cam_num, last_frame_num))
                         yield (
-                                b'--frame\r\n'
-                                b'Content-Type: image/png\r\n\r\n' + predicted_frame + b'\r\n\r\n')
+                                b"--frame\r\n"
+                                b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
             except StopIteration as e:
                 print(e)
@@ -120,15 +120,15 @@ def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_
             lock.release()
 
             yield (
-                    b'--frame\r\n'
-                    b'Content-Type: image/png\r\n\r\n' + predicted_frame + b'\r\n\r\n')
+                    b"--frame\r\n"
+                    b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
         else:
             lock.release()
             print("[CAM {}] STREAM ENDED AT FRAME {}".format(cam_num, last_frame_num))
             yield (
-                    b'--frame\r\n'
-                    b'Content-Type: image/png\r\n\r\n' + predicted_frame + b'\r\n\r\n')
+                    b"--frame\r\n"
+                    b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
 
 def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, buffer_size=180):
@@ -149,7 +149,7 @@ def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, 
                 # Get the predicted Object, JSON with frame and meta info about the frame
                 prediction_obj = msg.value
                 # frame cam_num
-                frame_num = int(prediction_obj['frame_num'])
+                frame_num = int(prediction_obj["frame_num"])
                 # extract images from the prediction message
                 original_png, predicted_png = get_png(prediction_obj)
 
@@ -158,8 +158,8 @@ def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, 
                 # DATA DICT: TO COLLECT REAL FRMAES
                 data_dict[cam_num][frame_num] = (original_png.tobytes(), predicted_png.tobytes())
                 # print log
-                print('\r[CAM {}][BUFFER] Pushed: {} {}/{}'.format(cam_num, prediction_obj['frame_num'],
-                                                                   len(buffer_dict[cam_num]), buffer_size), end='')
+                print("\r[CAM {}][BUFFER] Pushed: {} {}/{}".format(cam_num, prediction_obj["frame_num"],
+                                                                   len(buffer_dict[cam_num]), buffer_size), end="")
 
                 # as soon as buffer is full for the first time, start consuming/display event on flask
                 if len(buffer_dict[cam_num]) == buffer_size and not event_threads[cam_num].is_set():
@@ -191,41 +191,30 @@ def get_png(prediction_obj):
     predicted_frame = np_from_json(prediction_obj, prefix_name=PREDICTED_PREFIX)
 
     # convert the image png --> display
-    _, original_png = cv2.imencode('.png', original_frame)
-    _, predicted_png = cv2.imencode('.png', predicted_frame)
+    _, original_png = cv2.imencode(".png", original_frame)
+    _, predicted_png = cv2.imencode(".png", predicted_frame)
 
     return original_png, predicted_png
 
 
-def clear_frame_topic(frame_topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
+def clear_topic(topic=FRAME_TOPIC):
     """Util function to clear frame topic.
-    :param partitions:
-    :param frame_topic:
+    :param topic: topic to delete.
     """
+    os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}".format(topic))
 
-    os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}".format(frame_topic))
+
+def set_topic(topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
+    """Util function to set topic.
+    :param topic: topic to delete.
+    :param partitions: set partitions.
+    """
     # SETTING UP TOPIC WITH DESIRED PARTITIONS
     init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 " \
-               "--replication-factor 3 --partitions {} --topic {}".format(partitions, frame_topic)
+               "--replication-factor 6 --partitions {} --topic {}".format(partitions, topic)
 
-    print('\n', init_cmd, '\n')
+    print("\n", init_cmd, "\n")
     os.system(init_cmd)
-
-    time.sleep(5)
-
-    # SETTING UP TOPIC WITH DESIRED PARTITIONS
-    alter_cmd = "/usr/local/kafka/bin/kafka-topics.sh --alter --zookeeper localhost:2181 " \
-                "--topic frame_objects_v2 --partitions {}".format(partitions)
-
-    # SANITY CHECK ALTER TOPIC WITH DESIRED PARTITIONS
-    print('\n', alter_cmd, '\n')
-    os.system(alter_cmd)
-
-
-def clear_known_face_topic():
-    """Util function to clear known face broadcasting topic."""
-    os.system(
-        "/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}".format(KNOWN_FACE_TOPIC))
 
 
 def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX):
@@ -240,22 +229,22 @@ def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX):
             prediction_prefix, i))
 
 
-def np_to_json(obj, prefix_name=''):
+def np_to_json(obj, prefix_name=""):
     """Serialize numpy.ndarray obj
     :param prefix_name: unique name for this array.
     :param obj: numpy.ndarray"""
-    return {'{}_frame'.format(prefix_name): base64.b64encode(obj.tostring()).decode("utf-8"),
-            '{}_dtype'.format(prefix_name): obj.dtype.str,
-            '{}_shape'.format(prefix_name): obj.shape}
+    return {"{}_frame".format(prefix_name): base64.b64encode(obj.tostring()).decode("utf-8"),
+            "{}_dtype".format(prefix_name): obj.dtype.str,
+            "{}_shape".format(prefix_name): obj.shape}
 
 
-def np_from_json(obj, prefix_name=''):
+def np_from_json(obj, prefix_name=""):
     """Deserialize numpy.ndarray obj
     :param prefix_name: unique name for this array.
     :param obj: numpy.ndarray"""
-    return np.frombuffer(base64.b64decode(obj['{}_frame'.format(prefix_name)].encode("utf-8")),
-                         dtype=np.dtype(obj['{}_dtype'.format(prefix_name)])).reshape(
-        obj['{}_shape'.format(prefix_name)])
+    return np.frombuffer(base64.b64decode(obj["{}_frame".format(prefix_name)].encode("utf-8")),
+                         dtype=np.dtype(obj["{}_dtype".format(prefix_name)])).reshape(
+        obj["{}_shape".format(prefix_name)])
 
 
 def get_video_feed_url(camera_num=0, folder="videos"):
