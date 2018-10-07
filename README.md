@@ -27,7 +27,7 @@
 
 ## Key Features
 
--   Scalable - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node.
+-   Scalable - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node. The producers and consumers are designed as python processes, as subclass of [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)
 -   Stream Processing in Python - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala.
 -   Modular approach - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
 
@@ -92,7 +92,11 @@ This software uses following open source packages.
 -   [kafka](https://github.com/apache/kafka)
 -   [pegasus](https://github.com/InsightDataScience/pegasus)
 
-## Related
+## Extension
+
+#### Using the eye for object detection over multiple cameras using [pretrained mobilenet model.](https://github.com/shicai/MobileNet-Caffe)
+
+![screenshot](/data/demov0.gif)
 
 ## Support
 
