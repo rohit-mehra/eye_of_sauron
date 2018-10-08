@@ -21,7 +21,7 @@ PREDICTION_TOPIC_PREFIX = "{}_{}".format("predicted_object", FRAME_TOPIC)
 C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 # CAMERA URL INDEXES
 # CAMERAS = [1, 5]  # [Michelle, Jeff]
-CAMERAS = [2, 3, 4]  # [Wagner, Jensen]
+CAMERAS = [0, 1, 2, 3, 4, 5]  # [Wagner, Jensen]
 
 # TOTAL CAMERAS TO BE USED --> USED FOR FULL URL
 TOTAL_CAMERAS = len(CAMERAS)
@@ -30,7 +30,7 @@ TOTAL_CAMERAS = len(CAMERAS)
 USE_RAW_CV2_STREAMING = False
 
 # TOPIC PARTITIONS
-SET_PARTITIONS = 80
+SET_PARTITIONS = 120
 
 ORIGINAL_PREFIX = "predicted"
 PREDICTED_PREFIX = "predicted"
