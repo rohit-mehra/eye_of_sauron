@@ -20,7 +20,7 @@ from params import *
 
 clear_prediction_topics()
 
-BUFFER_SIZE = 900
+BUFFER_SIZE = 300
 BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()
@@ -240,7 +240,6 @@ if THREADED_BUFFER_CONCEPT:
                                                             BUFFER_DICT,
                                                             DATA_DICT,
                                                             EVENT_THREADS,
-                                                            LOCK,
                                                             BUFFER_SIZE])
         BUFFER_THREADS[cam_num] = bt
         bt.start()

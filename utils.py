@@ -132,7 +132,7 @@ def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_
                     b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
 
-def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, lock, buffer_size=180):
+def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, buffer_size=180):
     """Fills the heap buffer, sets of an event to display as soon as set buffer limit hits.
     :param buffer_size: Buffer Size
     :param event_threads: To set specific consumption event, when specific buffer is full, specific to camera/stream
@@ -140,15 +140,14 @@ def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, 
     :param buffer_dict: Collection of buffers for different cameras
     :param msg_stream: message stream from respective camera topic, topic in format [PREDICTION_TOPIC_PREFIX]_[cam_num]
     :param cam_num: camera number, used to access respective buffer, or data
-    :param lock: for sync
     """
 
     try:
         # start populating the buffer
         while True:
             try:
-                raw_messages = msg_stream.poll(timeout_ms=120, max_records=120)
-
+                raw_messages = msg_stream.poll(timeout_ms=10000, max_records=120)
+                print("[populate_buffer] WAITING FOR NEXT FRAME..")
                 for topic_partition, msgs in raw_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame
                     for msg in msgs:
