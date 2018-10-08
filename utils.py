@@ -110,7 +110,7 @@ def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_
     original_frame, predicted_frame = bytes(0), bytes(0)
 
     while True:
-        time.sleep(0.02)
+        time.sleep(0.03)
         # Acquire sync lock, prevents deadlock and maintains consistency
         lock.acquire()
         last_frame_num = frame_number

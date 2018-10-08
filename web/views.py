@@ -20,7 +20,7 @@ from params import *
 
 clear_prediction_topics()
 
-BUFFER_SIZE = 300
+BUFFER_SIZE = 600
 BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()

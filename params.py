@@ -18,7 +18,7 @@ PREDICTION_TOPIC_PREFIX = "{}_{}".format("predicted_object", FRAME_TOPIC)
 C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 # CAMERA URL INDEXES
 # CAMERAS = [1, 5]  # [Michelle, Jeff]
-CAMERAS = [3, 4]  # [Wagner, Jensen]
+CAMERAS = [2, 3, 4]  # [Wagner, Jensen]
 
 # TOTAL CAMERAS TO BE USED --> USED FOR FULL URL
 TOTAL_CAMERAS = len(CAMERAS)
