@@ -9,7 +9,7 @@ import imutils
 import numpy as np
 from imutils.video import VideoStream
 from kafka import KafkaProducer, TopicPartition
-from kafka.partitioner import RoundRobinPartitioner
+from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
 
 from utils import np_to_json
 
@@ -26,7 +26,8 @@ class StreamVideo(Process):
                  group=None,
                  target=None,
                  name=None,
-                 verbose=False):
+                 verbose=False,
+                 rr_distribute=False):
 
         super().__init__(group=group, target=target, name=name)
 
@@ -40,6 +41,7 @@ class StreamVideo(Process):
         self.use_cv2 = use_cv2
         self.object_key = pub_obj_key
         self.verbose = verbose
+        self.rr_distribute = rr_distribute
 
     def run(self):
         """Publish video frames as json objects, timestamped, marked with camera number.
@@ -51,9 +53,16 @@ class StreamVideo(Process):
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         """
 
-        partitioner = RoundRobinPartitioner(partitions=
-                                            [TopicPartition(topic=self.frame_topic, partition=i)
-                                             for i in range(self.topic_partitions)])
+        if self.rr_distribute:
+            partitioner = RoundRobinPartitioner(partitions=
+                                                [TopicPartition(topic=self.frame_topic, partition=i)
+                                                 for i in range(self.topic_partitions)])
+
+        else:
+
+            partitioner = Murmur2Partitioner(partitions=
+                                             [TopicPartition(topic=self.frame_topic, partition=i)
+                                              for i in range(self.topic_partitions)])
 
         frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                        key_serializer=lambda key: str(key).encode(),

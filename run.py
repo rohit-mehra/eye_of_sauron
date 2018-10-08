@@ -28,7 +28,8 @@ CAMERA_URLS = [get_video_feed_url(i, folder="tracking") for i in CAMERAS]
 PRODUCERS = [StreamVideo(url, FRAME_TOPIC, SET_PARTITIONS,
                          use_cv2=USE_RAW_CV2_STREAMING,
                          verbose=True,
-                         pub_obj_key=ORIGINAL_PREFIX) for url in
+                         pub_obj_key=ORIGINAL_PREFIX,
+                         rr_distribute=ROUND_ROBIN) for url in
              CAMERA_URLS]
 
 # Start Publishing frames from cameras to the frame topic

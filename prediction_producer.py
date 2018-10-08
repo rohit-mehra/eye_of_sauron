@@ -9,7 +9,8 @@ import face_recognition
 import numpy as np
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
-from kafka.partitioner import RoundRobinPartitioner
+from kafka.coordinator.assignors.range import RangePartitionAssignor
+from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
 from kafka.structs import OffsetAndMetadata, TopicPartition
 
 from params import *
@@ -27,7 +28,9 @@ class ConsumeFrames(Process):
                  target=None,
                  name=None,
                  scale=1.0,
-                 verbose=False):
+                 verbose=False,
+                 rr_distribute=False):
+
         super().__init__(group=group, target=target, name=name)
 
         self.iam = "{}-{}".format(socket.gethostname(), self.name)
@@ -37,24 +40,35 @@ class ConsumeFrames(Process):
         self.scale = scale
         self.topic_partitions = topic_partitions
         self.processed_frame_topic = processed_frame_topic
+        self.rr_distribute = rr_distribute
         print("[INFO] I am ", self.iam)
 
     def run(self):
         """CONSUME video frames, predictions Published to respective camera topics"""
         # Connect to kafka, Consume frame obj bytes deserialize to json
+        partition_assignment_strategy = [RoundRobinPartitionAssignor] if self.rr_distribute else [RangePartitionAssignor,
+                                                                                                  RoundRobinPartitionAssignor]
+
         frame_consumer = KafkaConsumer(group_id="consume", client_id=self.iam,
                                        bootstrap_servers=["0.0.0.0:9092"],
                                        key_deserializer=lambda key: key.decode(),
                                        value_deserializer=lambda value: json.loads(value.decode()),
-                                       partition_assignment_strategy=[RoundRobinPartitionAssignor],
+                                       partition_assignment_strategy=partition_assignment_strategy,
                                        auto_offset_reset="earliest")
 
         frame_consumer.subscribe([self.frame_topic])
 
         # partitioner for processed frame topic
-        partitioner = RoundRobinPartitioner(partitions=
-                                            [TopicPartition(topic=self.frame_topic, partition=i)
-                                             for i in range(self.topic_partitions)])
+        if self.rr_distribute:
+            partitioner = RoundRobinPartitioner(partitions=
+                                                [TopicPartition(topic=self.frame_topic, partition=i)
+                                                 for i in range(self.topic_partitions)])
+
+        else:
+
+            partitioner = Murmur2Partitioner(partitions=
+                                             [TopicPartition(topic=self.frame_topic, partition=i)
+                                              for i in range(self.topic_partitions)])
         #  Produces prediction object
         processed_frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                                  key_serializer=lambda key: str(key).encode(),
@@ -140,7 +154,8 @@ class PredictFrames(Process):
                  target=None,
                  name=None,
                  scale=1.0,
-                 verbose=False):
+                 verbose=False,
+                 rr_distribute=False):
         super().__init__(group=group, target=target, name=name)
 
         self.iam = "{}-{}".format(socket.gethostname(), self.name)
@@ -148,16 +163,20 @@ class PredictFrames(Process):
         self.query_faces_topic = query_faces_topic
         self.verbose = verbose
         self.scale = scale
+        self.rr_distribute = rr_distribute
         print("[INFO] I am ", self.iam)
 
     def run(self):
         """CONSUME video frames, predictions Published to respective camera topics"""
         # Connect to kafka, Consume frame obj bytes deserialize to json
-        frame_consumer = KafkaConsumer(group_id="predict", client_id=self.iam,
+        partition_assignment_strategy = [RoundRobinPartitionAssignor] if self.rr_distribute else [RangePartitionAssignor,
+                                                                                                  RoundRobinPartitionAssignor]
+
+        frame_consumer = KafkaConsumer(group_id="consume", client_id=self.iam,
                                        bootstrap_servers=["0.0.0.0:9092"],
                                        key_deserializer=lambda key: key.decode(),
                                        value_deserializer=lambda value: json.loads(value.decode()),
-                                       partition_assignment_strategy=[RoundRobinPartitionAssignor],
+                                       partition_assignment_strategy=partition_assignment_strategy,
                                        auto_offset_reset="earliest")
 
         frame_consumer.subscribe([self.frame_topic])
@@ -309,12 +328,14 @@ if __name__ == "__main__":
     CONSUME_FRAMES = [ConsumeFrames(frame_topic=FRAME_TOPIC,
                                     processed_frame_topic=PROCESSED_FRAME_TOPIC,
                                     topic_partitions=SET_PARTITIONS,
-                                    scale=1) for _ in
+                                    scale=1,
+                                    rr_distribute=ROUND_ROBIN) for _ in
                       range(HM_PROCESSESS)]
 
     PREDICT_FRAMES = [PredictFrames(processed_frame_topic=PROCESSED_FRAME_TOPIC,
                                     query_faces_topic=KNOWN_FACE_TOPIC,
-                                    scale=1) for _ in
+                                    scale=1,
+                                    rr_distribute=ROUND_ROBIN) for _ in
                       range(HM_PROCESSESS)]
 
     for p in PREDICT_FRAMES:
