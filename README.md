@@ -17,13 +17,12 @@
 <p align="center">
   <a href="#key-features">Key Features</a> •
   <a href="#how-to-use">How To Use</a> •
-  <a href="#download">Download</a> •
   <a href="#credits">Credits</a> •
   <a href="#related">Extension</a> •
   <a href="#license">License</a>
 </p>
 
-![screenshot](/data/demov2.gif)
+![screenshot](/data/6_2.gif)
 
 ## Key Features
 
@@ -94,15 +93,21 @@ This software uses following open source packages.
 
 ## Extension
 
-#### Using the eye for object detection over multiple cameras using [pretrained mobilenet model.](https://github.com/shicai/MobileNet-Caffe)
+#### [3 CAMERAS]
+
+![screenshot](/data/3_1.gif)
+
+#### [6 CAMERAS]
+
+![screenshot](/data/6_1.gif)
+
+#### Using the eye for object detection over multiple cameras using [pretrained MobileNet-Caffe model.](https://github.com/shicai/MobileNet-Caffe)
 
 ![screenshot](/data/demov0.gif)
 
-## Support
-
-## You may also like...
-
 * * *
+
+## Contact
 
 > [Linkedin](https://www.linkedin.com/in/rohitmehra-utsa/)  · 
 > GitHub [@rrqq](https://github.com/rrqq)  · 

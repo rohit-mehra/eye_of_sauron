@@ -287,7 +287,6 @@ class PredictFrames(Process):
 
                 if name == "Unknown":
                     color = (0, 0, 255)
-                    cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
                 else:
                     color = (255, 0, 0)
 

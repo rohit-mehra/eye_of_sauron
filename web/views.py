@@ -162,10 +162,8 @@ def results():
     known_face_encodings = [np.array(json.loads(kfe)) for kfe in session["known_face_encodings"]]
     image_file_names = session["image_file_names"]
 
-    # print(np.array(known_face_encodings), np.array(known_faces))
-    # print(np.array(known_face_encodings).shape, np.array(known_faces).shape)
     print("\n", known_faces, "\n")
-    # TODO: BROADCAST THE TARGET TO LOOK FOR:
+    # BROADCAST THE TARGET TO LOOK FOR:
     broadcast_message = np_to_json(np.array(known_face_encodings),
                                    prefix_name="known_face_encodings")
     broadcast_message.update(np_to_json(np.array(known_faces), prefix_name="known_faces"))
@@ -199,11 +197,12 @@ def results():
         # SAVE the results for this frame
         for (top, right, bottom, left), name in zip(face_locations, face_names):
             # Draw a box around the face
-            cv2.rectangle(image, (left, top), (right, bottom), (0, 0, 255), 2)
+            color = (0, 0, 255)
+            cv2.rectangle(image, (left, top), (right, bottom), color, 2)
 
             # Draw a label with a name below the face
-            cv2.rectangle(image, (left, bottom - 27), (right, bottom), (0, 0, 255), cv2.FILLED)
-            font = cv2.FONT_HERSHEY_DUPLEX
+            cv2.rectangle(image, (left, bottom - 27), (right, bottom), color, cv2.FILLED)
+            font = cv2.FONT_HERSHEY_SIMPLEX
             cv2.putText(image, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
 
         cv2.imwrite(file_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
