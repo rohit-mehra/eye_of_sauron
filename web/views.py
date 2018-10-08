@@ -25,7 +25,7 @@ BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()
 EVENT_THREADS = dict()
-THREADED_BUFFER_CONCEPT = False  # Use
+THREADED_BUFFER_CONCEPT = True  # Use
 
 save_dir = os.getcwd() + "/data/faces"
 
@@ -62,8 +62,9 @@ broadcast_known_faces = KafkaProducer(bootstrap_servers=["localhost:9092"],
 def cam(cam_num):
     # return a multipart response
     if THREADED_BUFFER_CONCEPT:
-        return Response(consume_buffer(int(cam_num), BUFFER_DICT, DATA_DICT, EVENT_THREADS, LOCK, buffer_size=BUFFER_SIZE),
-                        mimetype="multipart/x-mixed-replace; boundary=frame")
+        return Response(
+            consume_buffer(int(cam_num), BUFFER_DICT, DATA_DICT, EVENT_THREADS, LOCK, buffer_size=BUFFER_SIZE),
+            mimetype="multipart/x-mixed-replace; boundary=frame")
 
     return Response(consumer(int(cam_num), BUFFER_DICT, DATA_DICT, buffer_size=BUFFER_SIZE),
                     mimetype="multipart/x-mixed-replace; boundary=frame")
@@ -221,7 +222,7 @@ if THREADED_BUFFER_CONCEPT:
     prediction_topics = {cam_num: "{}_{}".format(PREDICTION_TOPIC_PREFIX, cam_num) for cam_num in cam_nums}
     prediction_consumers = {cam_num: KafkaConsumer(topic, group_id="view",
                                                    bootstrap_servers=["0.0.0.0:9092"],
-                                                   auto_offset_reset="latest",
+                                                   auto_offset_reset="earliest",
                                                    value_deserializer=lambda value: json.loads(value.decode()
                                                                                                )) for cam_num, topic in
                             prediction_topics.items()}
@@ -238,7 +239,9 @@ if THREADED_BUFFER_CONCEPT:
                                                             cam_num,
                                                             BUFFER_DICT,
                                                             DATA_DICT,
-                                                            EVENT_THREADS])
+                                                            EVENT_THREADS,
+                                                            LOCK,
+                                                            BUFFER_SIZE])
         BUFFER_THREADS[cam_num] = bt
         bt.start()
 

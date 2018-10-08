@@ -8,7 +8,8 @@ import cv2
 import imutils
 import numpy as np
 from imutils.video import VideoStream
-from kafka import KafkaProducer
+from kafka import KafkaProducer, TopicPartition
+from kafka.partitioner import RoundRobinPartitioner
 
 from utils import np_to_json
 
@@ -50,14 +51,19 @@ class StreamVideo(Process):
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         """
 
+        partitioner = RoundRobinPartitioner(partitions=
+                                            [TopicPartition(topic=self.frame_topic, partition=i)
+                                             for i in range(self.topic_partitions)])
+
         frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                        key_serializer=lambda key: str(key).encode(),
-                                       value_serializer=lambda value: json.dumps(value).encode())
+                                       value_serializer=lambda value: json.dumps(value).encode(),
+                                       partitioner=partitioner)
 
-        print("[CAM {}] URL: {}, TOPIC PARTITIONS: {}".format(self.camera_num,
-                                                              self.video_path,
-                                                              frame_producer.partitions_for(
-                                                                  self.frame_topic)))
+        print("[CAM {}] URL: {}, SET PARTITIONS FOR FRAME TOPIC: {}".format(self.camera_num,
+                                                                            self.video_path,
+                                                                            frame_producer.partitions_for(
+                                                                                self.frame_topic)))
         # Use either option
         video = cv2.VideoCapture(self.video_path) if self.use_cv2 else VideoStream(self.video_path).start()
 
@@ -106,7 +112,10 @@ class StreamVideo(Process):
                 print("\r[PRODUCER][Cam {}] FRAME: {} TO PARTITION: {}".format(message["camera"],
                                                                                frame_num, part), end="")
             # Publish to specific partition
-            frame_producer.send(self.frame_topic, key=frame_num, value=message, partition=part)
+            frame_producer.send(self.frame_topic, key="{}_{}".format(self.camera_num, frame_num), value=message)
+
+            # if frame_num % 1000 == 0:
+            frame_producer.flush()
 
             # To reduce CPU usage create sleep time of 0.1 sec
             if self.mnist:
@@ -134,6 +143,7 @@ class StreamVideo(Process):
             mnist: if video feed is mnist (used for prototyping)
             camera: Camera Number the frame is from
             object_key: identifier for these objects
+            verbose: print out logs
         Returns:
             A dict {"frame": string(base64encodedarray), "dtype": obj.dtype.str, "shape": obj.shape,
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
@@ -143,17 +153,21 @@ class StreamVideo(Process):
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # (28, 28)
         else:
             # to a standard size for UI
-            frame = imutils.resize(frame, width=600, height=600)
+            frame = imutils.resize(frame, width=400)
+
+        if verbose:
+            # print raw frame size
+            print("\nRAW ARRAY SIZE: ", sys.getsizeof(frame))
 
         # serialize frame
-        # frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
-        if verbose:
-            print("\nRAW ARRAY SIZE: ", sys.getsizeof(frame))
         frame_dict = np_to_json(frame.astype(np.uint8), prefix_name=object_key)
         # Metadata for frame
         message = {"timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         # add frame and metadata related to frame
         message.update(frame_dict)
+
         if verbose:
+            # print message size
             print("\nMESSAGE SIZE: ", sys.getsizeof(message))
+
         return message

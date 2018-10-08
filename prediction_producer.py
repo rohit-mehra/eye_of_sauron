@@ -8,6 +8,10 @@ import cv2
 import face_recognition
 import numpy as np
 from kafka import KafkaConsumer, KafkaProducer
+from kafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
+from kafka.partitioner import RoundRobinPartitioner
+from kafka.structs import OffsetAndMetadata, TopicPartition
+
 from params import *
 from utils import np_from_json, np_to_json
 
@@ -18,7 +22,7 @@ class ConsumeFrames(Process):
     def __init__(self,
                  frame_topic,
                  processed_frame_topic,
-                 topic_partitions=SET_PARTITIONS,
+                 topic_partitions=8,
                  group=None,
                  target=None,
                  name=None,
@@ -31,22 +35,31 @@ class ConsumeFrames(Process):
 
         self.verbose = verbose
         self.scale = scale
-        self.topic_partitions= topic_partitions
+        self.topic_partitions = topic_partitions
         self.processed_frame_topic = processed_frame_topic
         print("[INFO] I am ", self.iam)
 
     def run(self):
         """CONSUME video frames, predictions Published to respective camera topics"""
         # Connect to kafka, Consume frame obj bytes deserialize to json
-        frame_consumer = KafkaConsumer(self.frame_topic, group_id="consume", client_id=self.iam,
+        frame_consumer = KafkaConsumer(group_id="consume", client_id=self.iam,
                                        bootstrap_servers=["0.0.0.0:9092"],
                                        key_deserializer=lambda key: key.decode(),
-                                       value_deserializer=lambda value: json.loads(value.decode()))
+                                       value_deserializer=lambda value: json.loads(value.decode()),
+                                       partition_assignment_strategy=[RoundRobinPartitionAssignor],
+                                       auto_offset_reset="earliest")
 
+        frame_consumer.subscribe([self.frame_topic])
+
+        # partitioner for processed frame topic
+        partitioner = RoundRobinPartitioner(partitions=
+                                            [TopicPartition(topic=self.frame_topic, partition=i)
+                                             for i in range(self.topic_partitions)])
         #  Produces prediction object
         processed_frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                                  key_serializer=lambda key: str(key).encode(),
-                                                 value_serializer=lambda value: json.dumps(value).encode())
+                                                 value_serializer=lambda value: json.dumps(value).encode(),
+                                                 partitioner=partitioner)
 
         try:
             while True:
@@ -54,16 +67,23 @@ class ConsumeFrames(Process):
                 if self.verbose:
                     print("[ConsumeFrames {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
 
-                raw_frame_messages = frame_consumer.poll(timeout_ms=5, max_records=30)
+                raw_frame_messages = frame_consumer.poll(timeout_ms=10, max_records=10)
 
                 for topic_partition, msgs in raw_frame_messages.items():
+
                     # Get the predicted Object, JSON with frame and meta info about the frame
                     for msg in msgs:
                         result = self.get_processed_frame_object(msg.value, self.scale)
+                        tp = TopicPartition(msg.topic, msg.partition)
+                        offsets = {tp: OffsetAndMetadata(msg.offset, None)}
+                        frame_consumer.commit(offsets=offsets)
+
                         # Partition to be sent to
-                        part = int(result["frame_num"]) % self.topic_partitions
-                        processed_frame_producer.send(self.processed_frame_topic, key=result["frame_num"],
-                                                      value=result, partition=part)
+                        processed_frame_producer.send(self.processed_frame_topic,
+                                                      key="{}_{}".format(result["camera"], result["frame_num"]),
+                                                      value=result)
+
+                    processed_frame_producer.flush()
 
         except KeyboardInterrupt as e:
             print(e)
@@ -94,7 +114,7 @@ class ConsumeFrames(Process):
         else:
             rgb_small_frame = frame
 
-        with timer("*PROCESS RAW FRAME {}*".format(frame_obj["frame_num"])):
+        with timer("PROCESS RAW FRAME {}".format(frame_obj["frame_num"])):
             # Find all the faces and face encodings in the current frame of video
             with timer("Locations in frame"):
                 face_locations = np.array(face_recognition.face_locations(rgb_small_frame))
@@ -133,10 +153,14 @@ class PredictFrames(Process):
     def run(self):
         """CONSUME video frames, predictions Published to respective camera topics"""
         # Connect to kafka, Consume frame obj bytes deserialize to json
-        frame_consumer = KafkaConsumer(self.frame_topic, group_id="predict", client_id=self.iam,
+        frame_consumer = KafkaConsumer(group_id="predict", client_id=self.iam,
                                        bootstrap_servers=["0.0.0.0:9092"],
                                        key_deserializer=lambda key: key.decode(),
-                                       value_deserializer=lambda value: json.loads(value.decode()))
+                                       value_deserializer=lambda value: json.loads(value.decode()),
+                                       partition_assignment_strategy=[RoundRobinPartitionAssignor],
+                                       auto_offset_reset="earliest")
+
+        frame_consumer.subscribe([self.frame_topic])
 
         #  Produces prediction object
         prediction_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
@@ -158,12 +182,16 @@ class PredictFrames(Process):
                 if self.verbose:
                     print("[PredictFrames {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
 
-                raw_frame_messages = frame_consumer.poll(timeout_ms=5, max_records=30)
+                raw_frame_messages = frame_consumer.poll(timeout_ms=10, max_records=10)
 
                 for topic_partition, msgs in raw_frame_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame
                     for msg in msgs:
                         result = self.get_face_object(msg.value, query_faces_message.value, self.scale)
+
+                        tp = TopicPartition(msg.topic, msg.partition)
+                        offsets = {tp: OffsetAndMetadata(msg.offset, None)}
+                        frame_consumer.commit(offsets=offsets)
 
                         print("frame_num: {},camera_num: {}, latency: {}, y_hat: {}".format(
                             result["frame_num"],
@@ -176,6 +204,8 @@ class PredictFrames(Process):
                         prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result["camera"])
 
                         prediction_producer.send(prediction_topic, key=result["frame_num"], value=result)
+
+                    prediction_producer.flush()
 
         except KeyboardInterrupt as e:
             print(e)
@@ -208,7 +238,7 @@ class PredictFrames(Process):
                                             prefix_name="known_face_encodings").tolist()  # (n, 128)
         known_faces = np_from_json(query_faces_data, prefix_name="known_faces").tolist()  # (n, )
 
-        with timer("\nFACE RECOGNITION\n"):
+        with timer("\nFACE RECOGNITION {}\n".format(frame_obj["frame_num"])):
 
             # Faces found in this image
             face_names = []
@@ -236,12 +266,18 @@ class PredictFrames(Process):
                     bottom *= int(1 / scale)
                     left *= int(1 / scale)
 
+                if name == "Unknown":
+                    color = (0, 0, 255)
+                    cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+                else:
+                    color = (255, 0, 0)
+
                 # Draw a box around the face
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
+                cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
 
                 # Draw a label with a name below the face
-                cv2.rectangle(frame, (left, bottom - 27), (right, bottom), (0, 0, 255), cv2.FILLED)
-                cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 1)
+                cv2.rectangle(frame, (left, bottom - 27), (right, bottom), color, cv2.FILLED)
+                cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
         frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
         frame_dict = np_to_json(frame, prefix_name=PREDICTED_PREFIX)
@@ -269,9 +305,10 @@ def timer(name):
 
 if __name__ == "__main__":
 
-    HM_PROCESSESS = 1
+    HM_PROCESSESS = SET_PARTITIONS // 8
     CONSUME_FRAMES = [ConsumeFrames(frame_topic=FRAME_TOPIC,
                                     processed_frame_topic=PROCESSED_FRAME_TOPIC,
+                                    topic_partitions=SET_PARTITIONS,
                                     scale=1) for _ in
                       range(HM_PROCESSESS)]
 
@@ -291,4 +328,3 @@ if __name__ == "__main__":
 
     for p in PREDICT_FRAMES:
         p.join()
-

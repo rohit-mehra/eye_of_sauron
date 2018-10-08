@@ -15,8 +15,8 @@ clear_topic(FRAME_TOPIC)
 clear_topic(PROCESSED_FRAME_TOPIC)
 
 # set partitions
-set_topic(FRAME_TOPIC, 16)
-set_topic(PROCESSED_FRAME_TOPIC, 16)
+set_topic(FRAME_TOPIC, SET_PARTITIONS)
+set_topic(PROCESSED_FRAME_TOPIC, SET_PARTITIONS)
 # Wait
 time.sleep(3)
 
@@ -31,13 +31,16 @@ PRODUCERS = [StreamVideo(url, FRAME_TOPIC, SET_PARTITIONS,
                          pub_obj_key=ORIGINAL_PREFIX) for url in
              CAMERA_URLS]
 
+# Start Publishing frames from cameras to the frame topic
 for p in PRODUCERS:
     p.start()
 
 """--------------WEB APP--------------"""
 print("[MAIN]", CAMERA_URLS)
 
+# start the UI
 app.run(host="0.0.0.0", debug=False, threaded=True, port=3333)
 
+# wait for producer processes to end
 for p in PRODUCERS:
     p.join()

@@ -29,8 +29,9 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
         while True:
             frame_number = 0
             original_frame, predicted_frame = bytes(0), bytes(0)
+            start_buffer_consumption = False
             try:
-                raw_messages = msg_stream.poll(timeout_ms=1000, max_records=60)
+                raw_messages = msg_stream.poll(timeout_ms=12, max_records=12)
 
                 for topic_partition, msgs in raw_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame
@@ -50,30 +51,30 @@ def consumer(cam_num, buffer_dict, data_dict, buffer_size=180):
                                                                                    len(buffer_dict[cam_num]),
                                                                                    buffer_size),
                               end="")
+                        if len(buffer_dict[cam_num]) >= buffer_size:
+                            start_buffer_consumption = True
 
-                # as soon as buffer is full for the first time, start consuming/display event on flask
-                if len(buffer_dict[cam_num]) >= buffer_size:
-                    print("[CAM {}][PART 2] YIELD".format(cam_num))
+                    # as soon as buffer is full for the first time, start consuming/display event on flask
+                    if start_buffer_consumption:
+                        print("[CAM {}][PART 2] YIELD".format(cam_num))
 
-                    time.sleep(0.01)
+                        last_frame_num = frame_number
 
-                    last_frame_num = frame_number
+                        if len(buffer_dict[cam_num]):
 
-                    if len(buffer_dict[cam_num]):
+                            frame_number = heappop(buffer_dict[cam_num])
+                            print(frame_number)
+                            original_frame, predicted_frame = data_dict[cam_num][frame_number]
 
-                        frame_number = heappop(buffer_dict[cam_num])
-                        print(frame_number)
-                        original_frame, predicted_frame = data_dict[cam_num][frame_number]
+                            yield (
+                                    b"--frame\r\n"
+                                    b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
-                        yield (
-                                b"--frame\r\n"
-                                b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
-
-                    else:
-                        print("[CAM {}] STREAM ENDED AT FRAME {}".format(cam_num, last_frame_num))
-                        yield (
-                                b"--frame\r\n"
-                                b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
+                        else:
+                            print("[CAM {}] STREAM ENDED AT FRAME {}".format(cam_num, last_frame_num))
+                            yield (
+                                    b"--frame\r\n"
+                                    b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
             except StopIteration as e:
                 print(e)
@@ -125,13 +126,13 @@ def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_
 
         else:
             lock.release()
-            print("[CAM {}] STREAM ENDED AT FRAME {}".format(cam_num, last_frame_num))
+            print("[CAM {}] NO STREAM AFTER FRAME {}".format(cam_num, last_frame_num))
             yield (
                     b"--frame\r\n"
                     b"Content-Type: image/png\r\n\r\n" + predicted_frame + b"\r\n\r\n")
 
 
-def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, buffer_size=180):
+def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, lock, buffer_size=180):
     """Fills the heap buffer, sets of an event to display as soon as set buffer limit hits.
     :param buffer_size: Buffer Size
     :param event_threads: To set specific consumption event, when specific buffer is full, specific to camera/stream
@@ -139,32 +140,38 @@ def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, 
     :param buffer_dict: Collection of buffers for different cameras
     :param msg_stream: message stream from respective camera topic, topic in format [PREDICTION_TOPIC_PREFIX]_[cam_num]
     :param cam_num: camera number, used to access respective buffer, or data
+    :param lock: for sync
     """
 
     try:
         # start populating the buffer
         while True:
             try:
-                msg = next(msg_stream)
-                # Get the predicted Object, JSON with frame and meta info about the frame
-                prediction_obj = msg.value
-                # frame cam_num
-                frame_num = int(prediction_obj["frame_num"])
-                # extract images from the prediction message
-                original_png, predicted_png = get_png(prediction_obj)
+                raw_messages = msg_stream.poll(timeout_ms=120, max_records=120)
 
-                # HEAP BUFFER TO MAINTAIN THE ORDER: ONLY FRAME NUMBERS ARE PUSHED
-                heappush(buffer_dict[cam_num], frame_num)
-                # DATA DICT: TO COLLECT REAL FRMAES
-                data_dict[cam_num][frame_num] = (original_png.tobytes(), predicted_png.tobytes())
-                # print log
-                print("\r[CAM {}][BUFFER] Pushed: {} {}/{}".format(cam_num, prediction_obj["frame_num"],
-                                                                   len(buffer_dict[cam_num]), buffer_size), end="")
+                for topic_partition, msgs in raw_messages.items():
+                    # Get the predicted Object, JSON with frame and meta info about the frame
+                    for msg in msgs:
+                        # Get the predicted Object, JSON with frame and meta info about the frame
+                        prediction_obj = msg.value
+                        # frame cam_num
+                        frame_num = int(prediction_obj["frame_num"])
+                        # extract images from the prediction message
+                        original_png, predicted_png = get_png(prediction_obj)
 
-                # as soon as buffer is full for the first time, start consuming/display event on flask
-                if len(buffer_dict[cam_num]) == buffer_size and not event_threads[cam_num].is_set():
-                    print("\n[CAM {}][BUFFER] Starting Consuming loop..".format(cam_num))
-                    event_threads[cam_num].set()
+                        # HEAP BUFFER TO MAINTAIN THE ORDER: ONLY FRAME NUMBERS ARE PUSHED
+                        heappush(buffer_dict[cam_num], frame_num)
+                        # DATA DICT: TO COLLECT REAL FRMAES
+                        data_dict[cam_num][frame_num] = (original_png.tobytes(), predicted_png.tobytes())
+                        # print log
+                        print("\r[CAM {}][BUFFER] Pushed: {} {}/{}".format(cam_num, prediction_obj["frame_num"],
+                                                                           len(buffer_dict[cam_num]), buffer_size),
+                              end="")
+
+                        # as soon as buffer is full for the first time, start consuming/display event on flask
+                        if len(buffer_dict[cam_num]) == buffer_size and not event_threads[cam_num].is_set():
+                            print("\n[CAM {}][BUFFER] Starting Consuming loop..".format(cam_num))
+                            event_threads[cam_num].set()
 
             except StopIteration as e:
                 print(e)
@@ -211,7 +218,7 @@ def set_topic(topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
     """
     # SETTING UP TOPIC WITH DESIRED PARTITIONS
     init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 " \
-               "--replication-factor 6 --partitions {} --topic {}".format(partitions, topic)
+               "--replication-factor 3 --partitions {} --topic {}".format(partitions, topic)
 
     print("\n", init_cmd, "\n")
     os.system(init_cmd)
