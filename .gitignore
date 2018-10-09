@@ -15,5 +15,6 @@ __pycache__
 !data/*.md
 !data/*.png
 !data/*.gif
+!data/*.jpg
 !data/query_faces
 !models/*.md
