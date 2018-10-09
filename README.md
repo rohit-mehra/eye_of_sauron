@@ -21,7 +21,6 @@
   <a href="#️-configuration">Configuration</a> •
   <a href="#-examples">Examples</a> •
   <a href="#-credits">Credits</a> •
-
   <a href="#️-contact">Contact</a>
 
 </p>
