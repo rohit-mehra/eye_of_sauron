@@ -15,21 +15,28 @@
 </p>
 
 <p align="center">
-  <a href="#key-features">Key Features</a> •
+  <a href="#-key-features">Key Features</a> •
+  <a href="#️-stream-pipeline">Stream Pipeline</a> •
   <a href="#️-how-to-use">How To Use</a> •
   <a href="#️-configuration">Configuration</a> •
-  <a href="#-credits">Credits</a> •
   <a href="#-examples">Examples</a> •
+  <a href="#-credits">Credits</a> •
+
   <a href="#️-contact">Contact</a>
+
 </p>
 
-![screenshot](/data/6_2.gif)
+![demo](/data/6_2.gif)
 
-## 📝Key Features
+## 🎨 Key Features
 
 -   Scalable - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node. The producers and consumers are designed as python processes, as subclass of [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)
 -   Stream Processing in Python - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala.
 -   Modular approach - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
+
+## 🔨 Stream Pipeline
+
+![pipeline](/data/pipeline.jpg)
 
 ## ▶️ How To Use
 
@@ -102,16 +109,7 @@ $ python3 prediction_producer.py
 
     -   **PredictFrames** class inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process) class. Consumes messages containing encoded frames, detected face locations and encodings. The process waits for User Input i.e. Query or Target faces to look for. Matches detected faces with the query face and publishes the result to respective camera topic, ready to be consumed by steam app for viewing purpose. Here the results can also be pushed to database for analysis.
 
-## ❤️ Credits
-
-This software uses following open source packages.
-
--   [face_recognition](https://github.com/ageitgey/face_recognition)
--   [opencv](https://github.com/opencv/opencv)
--   [kafka](https://github.com/apache/kafka)
--   [pegasus](https://github.com/InsightDataScience/pegasus)
-
-## 💼 Examples
+## 🐾 Examples
 
 ##### A. 3 CAMERAS
 
@@ -124,6 +122,15 @@ This software uses following open source packages.
 #### C. Using the eye for object detection over multiple cameras using [pretrained MobileNet-Caffe model.](https://github.com/shicai/MobileNet-Caffe)
 
 ![screenshot](/data/demov0.gif)
+
+## ❤️ Credits
+
+This software uses following open source packages.
+
+-   [face_recognition](https://github.com/ageitgey/face_recognition)
+-   [opencv](https://github.com/opencv/opencv)
+-   [kafka](https://github.com/apache/kafka)
+-   [pegasus](https://github.com/InsightDataScience/pegasus)
 
 * * *
 
