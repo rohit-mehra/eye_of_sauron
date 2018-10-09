@@ -15,22 +15,22 @@
 </p>
 
 <p align="center">
-  <a href="#key-features">Key Features</a> •
-  <a href="#how-to-use">How To Use</a> •
-  <a href="#credits">Credits</a> •
-  <a href="#related">Extension</a> •
-  <a href="#license">License</a>
+  <a href="#key-features-">Key Features</a> •
+  <a href="#how-to-use-">How To Use</a> •
+  <a href="#configuration-">Configuration</a> •
+  <a href="#credits-">Credits</a> •
+  <a href="#examples-">Examples</a> •
 </p>
 
 ![screenshot](/data/6_2.gif)
 
-## Key Features
+## Key Features 📝
 
 -   Scalable - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node. The producers and consumers are designed as python processes, as subclass of [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)
 -   Stream Processing in Python - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala.
 -   Modular approach - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
 
-## How To Use
+## How To Use ▶️
 
 To clone and run this application, you'll need [Git](https://git-scm.com), [python3](https://www.python.org/downloads/) (also install  [pip](https://docs.python.org/3/installing/index.html)) and kafka (v1.0.0 and v1.1.0 with scala v2.11 and v2.12) (all combinations) installed on your cluster. I used [Pegasus](https://github.com/InsightDataScience/pegasus) for the cluster setup on aws with [environment setup](https://github.com/InsightDataScience/pegasus/blob/master/install/environment/install_env.sh) modified to [this custom setup file](/cluster_setup/install_env.sh).
 
@@ -82,7 +82,9 @@ $ sudo pip3 install -r requirements.txt
 $ python3 prediction_producer.py
 ```
 
-## Credits
+## Configuration ⚙️
+
+## Credits ❤️
 
 This software uses following open source packages.
 
@@ -91,23 +93,23 @@ This software uses following open source packages.
 -   [kafka](https://github.com/apache/kafka)
 -   [pegasus](https://github.com/InsightDataScience/pegasus)
 
-## Extension
+## Examples 💼
 
-#### [3 CAMERAS]
+##### A. 3 CAMERAS
 
 ![screenshot](/data/3_1.gif)
 
-#### [6 CAMERAS]
+##### B. 6 CAMERAS
 
 ![screenshot](/data/6_1.gif)
 
-#### Using the eye for object detection over multiple cameras using [pretrained MobileNet-Caffe model.](https://github.com/shicai/MobileNet-Caffe)
+#### C. Using the eye for object detection over multiple cameras using [pretrained MobileNet-Caffe model.](https://github.com/shicai/MobileNet-Caffe)
 
 ![screenshot](/data/demov0.gif)
 
 * * *
 
-## Contact
+## Contact ✏️
 
 > [Linkedin](https://www.linkedin.com/in/rohitmehra-utsa/)  · 
 > GitHub [@rrqq](https://github.com/rrqq)  · 
