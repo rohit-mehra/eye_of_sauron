@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <a href=""><img src="/data/logo.png" alt="The Eye of Sauron" width="200"></a>
+  <a href="https://youtu.be/3wrseXG_6Qw"><img src="/data/logo.png" alt="The Eye of Sauron" width="200"></a>
   <br>
   The Eye of Sauron
   <br>
@@ -15,12 +15,12 @@
 </p>
 
 <p align="center">
-  <a href="#-key-features">Key Features</a> •
-  <a href="#-how-to-use">How To Use</a> •
-  <a href="#-configuration">Configuration</a> •
-  <a href="#-credits">Credits</a> •
-  <a href="#-examples">Examples</a> •
-  <a href="#-contact">Contact</a>
+  <a href="#📝-key-features">Key Features</a> •
+  <a href="#▶️-how-to-use">How To Use</a> •
+  <a href="#⚙️-configuration">Configuration</a> •
+  <a href="#❤️-credits">Credits</a> •
+  <a href="#💼-examples">Examples</a> •
+  <a href="#✏️-contact">Contact</a>
 </p>
 
 ![screenshot](/data/6_2.gif)
