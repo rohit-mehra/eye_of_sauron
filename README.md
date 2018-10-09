@@ -20,6 +20,7 @@
   <a href="#configuration-">Configuration</a> •
   <a href="#credits-">Credits</a> •
   <a href="#examples-">Examples</a> •
+  <a href="#contact-">Contact</a> •
 </p>
 
 ![screenshot](/data/6_2.gif)
