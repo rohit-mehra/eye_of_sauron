@@ -15,23 +15,23 @@
 </p>
 
 <p align="center">
-  <a href="#key-features">Key Features</a> •
-  <a href="#how-to-use">How To Use</a> •
-  <a href="#configuration">Configuration</a> •
-  <a href="#credits">Credits</a> •
-  <a href="#examples">Examples</a> •
-  <a href="#contact">Contact</a>
+  <a href="#-key-features">Key Features</a> •
+  <a href="#-how-to-use">How To Use</a> •
+  <a href="#-configuration">Configuration</a> •
+  <a href="#-credits">Credits</a> •
+  <a href="#-examples">Examples</a> •
+  <a href="#-contact">Contact</a>
 </p>
 
 ![screenshot](/data/6_2.gif)
 
-## Key Features 📝
+## 📝Key Features
 
 -   Scalable - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node. The producers and consumers are designed as python processes, as subclass of [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)
 -   Stream Processing in Python - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala.
 -   Modular approach - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
 
-## How To Use ▶️
+## ▶️ How To Use
 
 To clone and run this application, you'll need [Git](https://git-scm.com), [python3](https://www.python.org/downloads/) (also install  [pip](https://docs.python.org/3/installing/index.html)) and kafka (v1.0.0 and v1.1.0 with scala v2.11 and v2.12) (all combinations) installed on your cluster. I used [Pegasus](https://github.com/InsightDataScience/pegasus) for the cluster setup on aws with [environment setup](https://github.com/InsightDataScience/pegasus/blob/master/install/environment/install_env.sh) modified to [this custom setup file](/cluster_setup/install_env.sh).
 
@@ -83,9 +83,26 @@ $ sudo pip3 install -r requirements.txt
 $ python3 prediction_producer.py
 ```
 
-## Configuration ⚙️
+## ⚙️ Configuration
 
-## Credits ❤️
+1.  [**params.py**](params.py)
+
+    -   **SET_PARTITIONS** to set number of partitions for FRAME_TOPIC and PROCESSED_FRAME_TOPIC, this controls the level of parallelism. Rule of thumb when latency is a key factor, is to keep number of partitions to be less than [100 x b x r](https://www.confluent.io/blog/how-choose-number-topics-partitions-kafka-cluster) where b is the number of brokers in the cluster and r is the replication factor. Multi-partition is good for **fault-tolerance**, dealing with the **scaling (up or down)** and reassignment scenarios. If one (or more) of the consumer is stopped during the process, the assignor will take this into account and reassign the non-consumed partitions to valid consumers.
+
+    -   **ROUND_ROBIN** set _True_ if you want to partition messages using [RoundRobinPartitioner](https://kafka-python.readthedocs.io/en/master/_modules/kafka/partitioner/roundrobin.html#RoundRobinPartitioner) else [Murmur2Partitioner](https://kafka-python.readthedocs.io/en/master/_modules/kafka/partitioner/hashed.html#Murmur2Partitioner)(Better option) will be used.
+
+2.  [**frame_producer.py**](frame_producer.py)
+
+    -   **StreamVideo** class inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process) class. It's used to process videos from video_path and publish it to a specific topic, here FRAME_TOPIC.
+
+
+3.  [**prediction_producer.py**](prediction_producer.py)
+
+    -   **ConsumeFrames** class inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process) class. Consumes messages containing encoded frames, timestamped and keyed. Processes each frame (detects faces in the frame specifically their locations, and calculates face encodings) and pushes the result to PROCESSED_FRAME_TOPIC.
+
+    -   **PredictFrames** class inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process) class. Consumes messages containing encoded frames, detected face locations and encodings. The process waits for User Input i.e. Query or Target faces to look for. Matches detected faces with the query face and publishes the result to respective camera topic, ready to be consumed by steam app for viewing purpose. Here the results can also be pushed to database for analysis.
+
+## ❤️ Credits
 
 This software uses following open source packages.
 
@@ -94,7 +111,7 @@ This software uses following open source packages.
 -   [kafka](https://github.com/apache/kafka)
 -   [pegasus](https://github.com/InsightDataScience/pegasus)
 
-## Examples 💼
+## 💼 Examples
 
 ##### A. 3 CAMERAS
 
@@ -110,7 +127,7 @@ This software uses following open source packages.
 
 * * *
 
-## Contact ✏️
+## ✏️ Contact
 
 > [Linkedin](https://www.linkedin.com/in/rohitmehra-utsa/)  · 
 > GitHub [@rrqq](https://github.com/rrqq)  · 
