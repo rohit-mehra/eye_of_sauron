@@ -15,19 +15,32 @@ from utils import np_to_json
 
 
 class StreamVideo(Process):
-    """Video Streaming Producer Process Class."""
 
     def __init__(self, video_path,
                  topic,
                  topic_partitions=8,
                  use_cv2=False,
-                 mnist=False,
                  pub_obj_key="original",
                  group=None,
                  target=None,
                  name=None,
                  verbose=False,
                  rr_distribute=False):
+        """
+        Video Streaming Producer Process Class. Publishes frames from a video source to a topic.
+
+        :param video_path: video path or url
+        :param topic: kafka topic to publish stamped encoded frames.
+        :param topic_partitions: number of partitions this topic has, for distributing messages among partitions
+        :param use_cv2: send every frame, using cv2 library, else will use imutils to speedup training
+        :param pub_obj_key: associate tag with every frame encoded, can be used later to separate raw frames
+        :param group: group should always be None; it exists solely for compatibility with threading.
+        :param target: Process Target
+        :param name: Process name
+        :param verbose: print logs on stdout
+        :param rr_distribute: use round robin partitioner, should be set same as consumers.
+
+        """
 
         super().__init__(group=group, target=target, name=name)
 
@@ -35,7 +48,6 @@ class StreamVideo(Process):
         self.video_path = video_path
         # TOPIC TO PUBLISH
         self.frame_topic = topic
-        self.mnist = mnist
         self.topic_partitions = topic_partitions
         self.camera_num = int(re.findall(r"StreamVideo-([0-9]*)", self.name)[0])
         self.use_cv2 = use_cv2
@@ -64,6 +76,7 @@ class StreamVideo(Process):
                                              [TopicPartition(topic=self.frame_topic, partition=i)
                                               for i in range(self.topic_partitions)])
 
+        # Producer object, set desired partitioner
         frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                        key_serializer=lambda key: str(key).encode(),
                                        value_serializer=lambda value: json.dumps(value).encode(),
@@ -109,7 +122,6 @@ class StreamVideo(Process):
             # Attach metadata to frame, transform into JSON
             message = self.transform(frame=image,
                                      frame_num=frame_num,
-                                     mnist=self.mnist,
                                      object_key=self.object_key,
                                      camera=self.camera_num,
                                      verbose=self.verbose)
@@ -126,10 +138,6 @@ class StreamVideo(Process):
             # if frame_num % 1000 == 0:
             frame_producer.flush()
 
-            # To reduce CPU usage create sleep time of 0.1 sec
-            if self.mnist:
-                time.sleep(0.1)
-
             frame_num += 1
 
         # clear the capture
@@ -144,25 +152,18 @@ class StreamVideo(Process):
         return True if frame_num > 0 else False
 
     @staticmethod
-    def transform(frame, frame_num, mnist=False, object_key="original", camera=0, verbose=False):
-        """Serialize frame, create json message with serialized frame, camera number and timestamp.
-        Args:
-            frame: numpy.ndarray, raw frame
-            frame_num: frame number in the particular video/camera
-            mnist: if video feed is mnist (used for prototyping)
-            camera: Camera Number the frame is from
-            object_key: identifier for these objects
-            verbose: print out logs
-        Returns:
-            A dict {"frame": string(base64encodedarray), "dtype": obj.dtype.str, "shape": obj.shape,
+    def transform(frame, frame_num, object_key="original", camera=0, verbose=False):
+        """
+        Serialize frame, create json message with serialized frame, camera number and timestamp.
+        :param frame: numpy.ndarray, raw frame
+        :param frame_num: frame number in the particular video/camera
+        :param object_key: identifier for these objects
+        :param camera: Camera Number the frame is from
+        :param verbose: print out logs
+        :return: A dict {"frame": string(base64encodedarray), "dtype": obj.dtype.str, "shape": obj.shape,
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         """
-
-        if mnist:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # (28, 28)
-        else:
-            # to a standard size for UI
-            frame = imutils.resize(frame, width=400)
+        frame = imutils.resize(frame, width=400)
 
         if verbose:
             # print raw frame size

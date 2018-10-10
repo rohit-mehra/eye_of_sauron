@@ -4,9 +4,9 @@ import os
 
 file_dir = os.path.dirname(os.path.realpath(__file__))
 
-"""General Parameters""""
+"""General Parameters"""
 # BROADCAST KNOWN FACE ENCODINGS OR PEOPLE TO FIND
-KNOWN_FACE_TOPIC = "target_face_topic"
+TARGET_FACE_TOPIC = "target_face_topic"
 # TOPIC USED TO PUBLISH ALL FRAME OBJECTS
 FRAME_TOPIC = "raw_frame_topic"
 # TOPIC USED TO PUBLISH ALL FRAME OBJECTS
@@ -20,11 +20,12 @@ PREDICTION_TOPIC_PREFIX = "{}_{}".format("predicted_object", FRAME_TOPIC)
 # USE RAW CV2 STREAMING or FAST BUT LESS FRAMES
 USE_RAW_CV2_STREAMING = False
 # TOPIC PARTITIONS
-SET_PARTITIONS = 120
+SET_PARTITIONS = 320
 # PARTITIONER
 ROUND_ROBIN = False
 
 """Demo Specific Parameters"""
+CLEAR_PRE_PROCESS_TOPICS = True
 # ENDPOINT FOR VIDEO STREAMS: URL WHERE VIDEOS ARE HOSTED
 C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 # CAMERA URL INDEXES: Videos are named as number.mp4 where number is in following list

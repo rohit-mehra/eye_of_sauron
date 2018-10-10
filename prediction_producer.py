@@ -8,8 +8,8 @@ import cv2
 import face_recognition
 import numpy as np
 from kafka import KafkaConsumer, KafkaProducer
-from kafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
 from kafka.coordinator.assignors.range import RangePartitionAssignor
+from kafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
 from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
 from kafka.structs import OffsetAndMetadata, TopicPartition
 
@@ -18,18 +18,31 @@ from utils import np_from_json, np_to_json
 
 
 class ConsumeFrames(Process):
-    """Consuming frame objects to, produce predictions."""
 
     def __init__(self,
                  frame_topic,
                  processed_frame_topic,
                  topic_partitions=8,
-                 group=None,
-                 target=None,
-                 name=None,
                  scale=1.0,
                  verbose=False,
-                 rr_distribute=False):
+                 rr_distribute=False,
+                 group=None,
+                 target=None,
+                 name=None):
+        """
+        Consuming encoded frame messages, detect faces and their encodings [PRE PROCESS],
+        publish it to processed_frame_topic where these values are used for face matching with query faces.
+
+        :param frame_topic: kafka topic to consume stamped encoded frames.
+        :param processed_frame_topic: kafka topic to publish stamped encoded frames with face detection and encodings.
+        :param topic_partitions: number of partitions processed_frame_topic topic has, for distributing messages among partitions
+        :param scale: (0, 1] scale image before face recognition, but less accurate, trade off!!
+        :param verbose: print logs on stdout
+        :param rr_distribute:  use round robin partitioner and assignor, should be set same as respective producers or consumers.
+        :param group: group should always be None; it exists solely for compatibility with threading.
+        :param target: Process Target
+        :param name: Process name
+        """
 
         super().__init__(group=group, target=target, name=name)
 
@@ -44,10 +57,13 @@ class ConsumeFrames(Process):
         print("[INFO] I am ", self.iam)
 
     def run(self):
-        """CONSUME video frames, predictions Published to respective camera topics"""
+        """Consume raw frames, detects faces, finds their encoding [PRE PROCESS],
+           predictions Published to processed_frame_topic fro face matching."""
+
         # Connect to kafka, Consume frame obj bytes deserialize to json
-        partition_assignment_strategy = [RoundRobinPartitionAssignor] if self.rr_distribute else [RangePartitionAssignor,
-                                                                                                  RoundRobinPartitionAssignor]
+        partition_assignment_strategy = [RoundRobinPartitionAssignor] if self.rr_distribute else [
+            RangePartitionAssignor,
+            RoundRobinPartitionAssignor]
 
         frame_consumer = KafkaConsumer(group_id="consume", client_id=self.iam,
                                        bootstrap_servers=["0.0.0.0:9092"],
@@ -87,7 +103,9 @@ class ConsumeFrames(Process):
 
                     # Get the predicted Object, JSON with frame and meta info about the frame
                     for msg in msgs:
+                        # get pre processing result
                         result = self.get_processed_frame_object(msg.value, self.scale)
+
                         tp = TopicPartition(msg.topic, msg.partition)
                         offsets = {tp: OffsetAndMetadata(msg.offset, None)}
                         frame_consumer.commit(offsets=offsets)
@@ -110,11 +128,10 @@ class ConsumeFrames(Process):
     @staticmethod
     def get_processed_frame_object(frame_obj, scale=1.0):
         """Processes value produced by producer, returns prediction with png image.
-        Args:
-            frame_obj: frame dictionary with frame information and frame itself
-            scale: (0, 1] scale image before face recognition, speeds up processing, decreases accuracy
-        Returns:
-            A dict updated with faces found in that frame, i.e. their location and encoding.
+
+        :param frame_obj: frame dictionary with frame information and frame itself
+        :param scale: (0, 1] scale image before face recognition, speeds up processing, decreases accuracy
+        :return: A dict updated with faces found in that frame, i.e. their location and encoding.
         """
 
         frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
@@ -145,17 +162,28 @@ class ConsumeFrames(Process):
 
 
 class PredictFrames(Process):
-    """Consuming frame objects to, produce predictions."""
 
     def __init__(self,
                  processed_frame_topic,
                  query_faces_topic,
-                 group=None,
-                 target=None,
-                 name=None,
                  scale=1.0,
                  verbose=False,
-                 rr_distribute=False):
+                 rr_distribute=False,
+                 group=None,
+                 target=None,
+                 name=None):
+        """
+        Consuming frame objects to, produce predictions.
+
+        :param processed_frame_topic: kafka topic to consume from stamped encoded frames with face detection and encodings.
+        :param query_faces_topic: kafka topic which broadcasts query face names and encodings.
+        :param scale: (0, 1] scale used during pre processing step.
+        :param verbose: print log
+        :param rr_distribute: use round robin partitioner and assignor, should be set same as respective producers or consumers.
+        :param group: group should always be None; it exists solely for compatibility with threading.
+        :param target: Process Target
+        :param name: Process name
+        """
         super().__init__(group=group, target=target, name=name)
 
         self.iam = "{}-{}".format(socket.gethostname(), self.name)
@@ -167,10 +195,14 @@ class PredictFrames(Process):
         print("[INFO] I am ", self.iam)
 
     def run(self):
-        """CONSUME video frames, predictions Published to respective camera topics"""
+        """Consume pre processed frames, match query face with faces detected in pre processing step
+        (published to processed frame topic) publish results, box added to frame data if in params,
+        ORIGINAL_PREFIX == PREDICTED_PREFIX"""
+
         # Connect to kafka, Consume frame obj bytes deserialize to json
-        partition_assignment_strategy = [RoundRobinPartitionAssignor] if self.rr_distribute else [RangePartitionAssignor,
-                                                                                                  RoundRobinPartitionAssignor]
+        partition_assignment_strategy = [RoundRobinPartitionAssignor] if self.rr_distribute else [
+            RangePartitionAssignor,
+            RoundRobinPartitionAssignor]
 
         frame_consumer = KafkaConsumer(group_id="consume", client_id=self.iam,
                                        bootstrap_servers=["0.0.0.0:9092"],
@@ -236,14 +268,14 @@ class PredictFrames(Process):
 
     @staticmethod
     def get_face_object(frame_obj, query_faces_data, scale=1.0):
-        """Processes value produced by producer, returns prediction with png image.
-        Args:
-            frame_obj: frame dictionary with frame information and frame itself
-            query_faces_data: a specialized dictionary with info about query face encodings and names
-            scale: (0, 1] scale image before face recognition, speeds up processing, decreases accuracy
-        Returns:
-            A dict with modified frame, i.e. bounded box drawn around detected persons face.
+        """Match query faces with detected faces in the frame, if matched put box and a tag.
+        :param frame_obj: frame dictionary with frame information, frame, face encodings, locations.
+        :param query_faces_data: message from query face topic, contains encoding and names of faces.
+        Other way was to broadcast raw image and calculate encodings here.
+        :param scale: to scale up as 1/scale, if in pre processing frames were scaled down for speedup.
+        :return: A dict with modified frame, i.e. bounded box drawn around detected persons face.
         """
+
         # get frame from message
         frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
         # get processed info from message
@@ -286,15 +318,15 @@ class PredictFrames(Process):
                     left *= int(1 / scale)
 
                 if name == "Unknown":
-                    color = (0, 0, 255)
+                    color = (0, 0, 255)  # blue
                 else:
-                    color = (255, 0, 0)
+                    color = (255, 0, 0)  # red
 
                 # Draw a box around the face
                 cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
 
                 # Draw a label with a name below the face
-                cv2.rectangle(frame, (left, bottom - 27), (right, bottom), color, cv2.FILLED)
+                cv2.rectangle(frame, (left, bottom - 21), (right, bottom), color, cv2.FILLED)
                 cv2.putText(frame, name, (left + 6, bottom - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
         frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
@@ -332,7 +364,7 @@ if __name__ == "__main__":
                       range(HM_PROCESSESS)]
 
     PREDICT_FRAMES = [PredictFrames(processed_frame_topic=PROCESSED_FRAME_TOPIC,
-                                    query_faces_topic=KNOWN_FACE_TOPIC,
+                                    query_faces_topic=TARGET_FACE_TOPIC,
                                     scale=1,
                                     rr_distribute=ROUND_ROBIN) for _ in
                       range(HM_PROCESSESS)]

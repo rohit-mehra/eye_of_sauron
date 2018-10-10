@@ -18,15 +18,18 @@ sys.path.insert(0, "..")
 from utils import populate_buffer, consume_buffer, consumer, np_to_json, clear_prediction_topics
 from params import *
 
+# Clear prediction topic, new view, new app instance.
 clear_prediction_topics()
 
-BUFFER_SIZE = 900
+# Buffer properties
+BUFFER_SIZE = 300
 BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()
 EVENT_THREADS = dict()
 THREADED_BUFFER_CONCEPT = True  # Use
 
+# UPLOAD SETTINGS
 save_dir = os.getcwd() + "/data/faces"
 
 if os.path.isdir(save_dir):
@@ -37,27 +40,24 @@ else:
 
 print(save_dir)
 
+# APP SETTINGS
 dropzone = Dropzone(app)
-
 app.config["SECRET_KEY"] = "dupersecretkeygoeshere"
-
-# Dropzone settings
 app.config["DROPZONE_UPLOAD_MULTIPLE"] = True
 app.config["DROPZONE_ALLOWED_FILE_CUSTOM"] = True
 app.config["DROPZONE_ALLOWED_FILE_TYPE"] = "image/*"
 app.config["DROPZONE_REDIRECT_VIEW"] = "results"
-
-# Uploads settings
 app.config["UPLOADED_PHOTOS_DEST"] = save_dir
-
 photos = UploadSet("photos", IMAGES)
 configure_uploads(app, photos)
 patch_request_class(app)  # set maximum file size, default is 16MB
 
+# INSTANTIATE BROADCAST TOPIC, USED TO SEND QUERY FACE MESSAGES
 broadcast_known_faces = KafkaProducer(bootstrap_servers=["localhost:9092"],
                                       value_serializer=lambda value: json.dumps(value).encode())
 
 
+# Individual camera stream
 @app.route("/cam/<cam_num>")
 def cam(cam_num):
     # return a multipart response
@@ -70,11 +70,13 @@ def cam(cam_num):
                     mimetype="multipart/x-mixed-replace; boundary=frame")
 
 
+# Render individual camera streams in one view
 @app.route("/cameras/<camera_numbers>")
 def get_cameras(camera_numbers):
     return render_template("videos.html", camera_numbers=list(range(1, 1 + int(camera_numbers))))
 
 
+# Index to upload query faces
 @app.route("/", methods=["GET", "POST"])
 def index():
     # set session for image results
@@ -114,7 +116,7 @@ def index():
             image = face_recognition.load_image_file(file_path)
 
             # Get encoding, out of all the first one, assumption just one face in the query image
-            image_encoding = face_recognition.face_encodings(image, num_jitters=18)[0]
+            image_encoding = face_recognition.face_encodings(image, num_jitters=3)[0]
 
             # append image encoding in string
             known_face_encodings.append(json.dumps(image_encoding.tolist()))
@@ -167,7 +169,7 @@ def results():
     broadcast_message = np_to_json(np.array(known_face_encodings),
                                    prefix_name="known_face_encodings")
     broadcast_message.update(np_to_json(np.array(known_faces), prefix_name="known_faces"))
-    broadcast_known_faces.send(KNOWN_FACE_TOPIC, value=broadcast_message)
+    broadcast_known_faces.send(TARGET_FACE_TOPIC, value=broadcast_message)
 
     # loop over uploaded images, in reality loop over test images or frames
     for file_name in image_file_names:
@@ -194,16 +196,17 @@ def results():
 
             face_names.append(name.title())
 
-        # SAVE the results for this frame
+        # draw boxes for this frame
         for (top, right, bottom, left), name in zip(face_locations, face_names):
             # Draw a box around the face
             color = (0, 0, 255)
             cv2.rectangle(image, (left, top), (right, bottom), color, 2)
 
             # Draw a label with a name below the face
-            cv2.rectangle(image, (left, bottom - 27), (right, bottom), color, cv2.FILLED)
+            cv2.rectangle(image, (left, bottom - 21), (right, bottom), color, cv2.FILLED)
             font = cv2.FONT_HERSHEY_SIMPLEX
             cv2.putText(image, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
+            break
 
         cv2.imwrite(file_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
@@ -216,6 +219,7 @@ def results():
     return render_template("results.html", file_urls_names=zip(file_urls, known_faces))
 
 
+# Start Buffer thread
 if THREADED_BUFFER_CONCEPT:
     cam_nums = [i for i in range(1, TOTAL_CAMERAS + 1)]
     prediction_topics = {cam_num: "{}_{}".format(PREDICTION_TOPIC_PREFIX, cam_num) for cam_num in cam_nums}

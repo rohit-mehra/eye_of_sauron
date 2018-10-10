@@ -16,7 +16,7 @@
 
 <p align="center">
   <a href="#-key-features">Key Features</a> •
-  <a href="#️-stream-pipeline">Stream Pipeline</a> •
+  <a href="#️-stream-processing-pipeline">Stream Processing Pipeline</a> •
   <a href="#️-how-to-use">How To Use</a> •
   <a href="#️-configuration">Configuration</a> •
   <a href="#-examples">Examples</a> •
@@ -33,7 +33,7 @@
 -   Stream Processing in Python - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala.
 -   Modular approach - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
 
-## 🔨 Stream Pipeline
+## 🔨 Stream Processing Pipeline
 
 ![pipeline](/data/pipeline.jpg)
 
@@ -99,14 +99,14 @@ $ python3 prediction_producer.py
 
 2.  [**frame_producer.py**](frame_producer.py)
 
-    -   **StreamVideo** class inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process) class. It's used to process videos from video_path and publish it to a specific topic, here FRAME_TOPIC.
+    -   **StreamVideo** class (inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)) is used to process videos from video_path and publish it to a specific topic, here FRAME_TOPIC.
 
 
 3.  [**prediction_producer.py**](prediction_producer.py)
 
-    -   **ConsumeFrames** class inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process) class. Consumes messages containing encoded frames, timestamped and keyed. Processes each frame (detects faces in the frame specifically their locations, and calculates face encodings) and pushes the result to PROCESSED_FRAME_TOPIC.
+    -   **ConsumeFrames** class (inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)) consumes messages containing encoded frames, timestamped and keyed. Processes each frame (detects faces in the frame specifically their locations, and calculates face encodings) and pushes the result to PROCESSED_FRAME_TOPIC.
 
-    -   **PredictFrames** class inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process) class. Consumes messages containing encoded frames, detected face locations and encodings. The process waits for User Input i.e. Query or Target faces to look for. Matches detected faces with the query face and publishes the result to respective camera topic, ready to be consumed by steam app for viewing purpose. Here the results can also be pushed to database for analysis.
+    -   **PredictFrames** class (inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)) consumes messages containing encoded frames, detected face locations and encodings. The process waits for User Input i.e. Query or Target faces to look for. Matches detected faces with the query face and publishes the result to respective camera topic, ready to be consumed by steam app for viewing purpose. Here the results can also be pushed to database for analysis.
 
 ## 🐾 Examples
 

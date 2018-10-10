@@ -1,3 +1,4 @@
+"""Utility functions to support APP"""
 import base64
 import json
 import time
@@ -110,7 +111,7 @@ def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_
     original_frame, predicted_frame = bytes(0), bytes(0)
 
     while True:
-        time.sleep(0.03)
+        time.sleep(0.033)
         # Acquire sync lock, prevents deadlock and maintains consistency
         lock.acquire()
         last_frame_num = frame_number
@@ -146,7 +147,7 @@ def populate_buffer(msg_stream, cam_num, buffer_dict, data_dict, event_threads, 
         # start populating the buffer
         while True:
             try:
-                raw_messages = msg_stream.poll(timeout_ms=10000, max_records=120)
+                raw_messages = msg_stream.poll(timeout_ms=10000, max_records=900)
                 print("[populate_buffer] WAITING FOR NEXT FRAME..")
                 for topic_partition, msgs in raw_messages.items():
                     # Get the predicted Object, JSON with frame and meta info about the frame
