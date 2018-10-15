@@ -75,7 +75,7 @@ or
 $ python3 run_producers.py
 ```
 
-Note: If you're using Linux Bash you might need to convert run.py as
+Note: If you're using Linux Bash you might need to convert run files as
 
 ```bash
 $ sudo apt-get install dos2unix
