@@ -20,6 +20,7 @@
   <a href="#-how-to-use">How To Use</a> •
   <a href="#-configuration">Configuration</a> •
   <a href="#-examples">Examples</a> •
+  <a href="#-scaling-performance">Scaling Performance</a> •
   <a href="#-credits">Credits</a> •
   <a href="#-contact">Contact</a>
 
@@ -127,6 +128,10 @@ $ python3 run_consumers.py
 #### C. Using the eye for object detection over multiple cameras using [pretrained MobileNet-Caffe model.](https://github.com/shicai/MobileNet-Caffe)
 
 ![screenshot](/data/demov0.gif)
+
+## 🚀 Scaling Performance
+
+![latency](/data/latency.jpg)
 
 ## ❤️ Credits
 
