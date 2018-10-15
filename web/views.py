@@ -1,6 +1,5 @@
 import json
 import shutil
-import sys
 import threading
 from collections import defaultdict
 
@@ -12,17 +11,15 @@ from flask_dropzone import Dropzone
 from flask_uploads import UploadSet, configure_uploads, IMAGES, patch_request_class
 from kafka import KafkaConsumer, KafkaProducer
 
+from src.params import *
+from src.utils import populate_buffer, consume_buffer, consumer, np_to_json, clear_prediction_topics
 from web import app
-
-sys.path.insert(0, "..")
-from utils import populate_buffer, consume_buffer, consumer, np_to_json, clear_prediction_topics
-from params import *
 
 # Clear prediction topic, new view, new app instance.
 clear_prediction_topics()
 
 # Buffer properties
-BUFFER_SIZE = 300
+BUFFER_SIZE = 600
 BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()

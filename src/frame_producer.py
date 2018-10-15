@@ -10,8 +10,7 @@ import numpy as np
 from imutils.video import VideoStream
 from kafka import KafkaProducer, TopicPartition
 from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
-
-from utils import np_to_json
+from .utils import np_to_json
 
 
 class StreamVideo(Process):
@@ -26,8 +25,7 @@ class StreamVideo(Process):
                  name=None,
                  verbose=False,
                  rr_distribute=False):
-        """
-        Video Streaming Producer Process Class. Publishes frames from a video source to a topic.
+        """Video Streaming Producer Process Class. Publishes frames from a video source to a topic.
 
         :param video_path: video path or url
         :param topic: kafka topic to publish stamped encoded frames.
@@ -57,6 +55,7 @@ class StreamVideo(Process):
 
     def run(self):
         """Publish video frames as json objects, timestamped, marked with camera number.
+
         Source:
             self.video_path: URL for streaming video
             self.kwargs["use_cv2"]: use raw cv2 streaming, set to false to use smart fast streaming --> not every frame is sent.
@@ -153,8 +152,8 @@ class StreamVideo(Process):
 
     @staticmethod
     def transform(frame, frame_num, object_key="original", camera=0, verbose=False):
-        """
-        Serialize frame, create json message with serialized frame, camera number and timestamp.
+        """Serialize frame, create json message with serialized frame, camera number and timestamp.
+
         :param frame: numpy.ndarray, raw frame
         :param frame_num: frame number in the particular video/camera
         :param object_key: identifier for these objects

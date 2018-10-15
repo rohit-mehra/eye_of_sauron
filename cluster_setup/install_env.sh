@@ -71,6 +71,8 @@ wait
 jupyter notebook --generate-config
 echo "c.NotebookApp.ip = '*'" >> /home/ubuntu/.jupyter/jupyter_notebook_config.py
 echo "c.NotebookApp.open_browser = False" >> /home/ubuntu/.jupyter/jupyter_notebook_config.py
+
+# ---> make sure you replace ubuntu with your username <---
 sudo chown -R ubuntu:ubuntu /home/ubuntu/.local
 
 # python2.7

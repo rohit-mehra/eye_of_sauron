@@ -13,8 +13,8 @@ from kafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
 from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
 from kafka.structs import OffsetAndMetadata, TopicPartition
 
-from params import *
-from utils import np_from_json, np_to_json
+from src.params import *
+from src.utils import np_from_json, np_to_json
 
 
 class ConsumeFrames(Process):
@@ -30,7 +30,7 @@ class ConsumeFrames(Process):
                  target=None,
                  name=None):
         """
-        Consuming encoded frame messages, detect faces and their encodings [PRE PROCESS],
+        FACE DETECTION IN FRAMES --> Consuming encoded frame messages, detect faces and their encodings [PRE PROCESS],
         publish it to processed_frame_topic where these values are used for face matching with query faces.
 
         :param frame_topic: kafka topic to consume stamped encoded frames.
@@ -173,7 +173,7 @@ class PredictFrames(Process):
                  target=None,
                  name=None):
         """
-        Consuming frame objects to, produce predictions.
+        FACE MATCHING TO QUERY FACES --> Consuming frame objects to produce predictions.
 
         :param processed_frame_topic: kafka topic to consume from stamped encoded frames with face detection and encodings.
         :param query_faces_topic: kafka topic which broadcasts query face names and encodings.
@@ -226,8 +226,16 @@ class PredictFrames(Process):
         print("[PredictFrames {}] WAITING FOR TRACKING INFO..".format(socket.gethostname()))
         query_faces_message = next(query_faces_consumer)
         print("[PredictFrames {}] GOT TRACKING INFO..".format(socket.gethostname()))
-
+        log_file_name = '{}/{}/consumer_{}_workers_{}_cameras_{}.csv'.format(MAIN_PATH, LOG_DIR,
+                                                                             self.name,
+                                                                             SET_PARTITIONS,
+                                                                             TOTAL_CAMERAS)
+        log_file = None
         try:
+            # log just one process, gives a good estimate of the total lag
+            print("Writing header to {}".format(log_file_name))
+            log_file = open(log_file_name, 'w')
+            log_file.write('camera,frame,prediction,consumers,latency\n')
             while True:
 
                 if self.verbose:
@@ -250,6 +258,12 @@ class PredictFrames(Process):
                             result["latency"],
                             result["prediction"]
                         ))
+                        log_file.write("{},{},{},{},{},{}".format(result["camera"],
+                                                                  result["frame_num"],
+                                                                  result["prediction"],
+                                                                  SET_PARTITIONS,
+                                                                  result["latency"],
+                                                                  "\n"))
 
                         # camera specific topic
                         prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result["camera"])
@@ -259,12 +273,15 @@ class PredictFrames(Process):
                     prediction_producer.flush()
 
         except KeyboardInterrupt as e:
-            print(e)
-            pass
+            print("Closing Stream")
+            frame_consumer.close()
+            if str(self.name) == "1":
+                log_file.close()
 
         finally:
             print("Closing Stream")
             frame_consumer.close()
+            log_file.close()
 
     @staticmethod
     def get_face_object(frame_obj, query_faces_data, scale=1.0):
@@ -351,32 +368,3 @@ def timer(name):
     t0 = time.time()
     yield
     print("[{}] done in {:.3f} s".format(name, time.time() - t0))
-
-
-if __name__ == "__main__":
-
-    HM_PROCESSESS = SET_PARTITIONS // 8
-    CONSUME_FRAMES = [ConsumeFrames(frame_topic=FRAME_TOPIC,
-                                    processed_frame_topic=PROCESSED_FRAME_TOPIC,
-                                    topic_partitions=SET_PARTITIONS,
-                                    scale=1,
-                                    rr_distribute=ROUND_ROBIN) for _ in
-                      range(HM_PROCESSESS)]
-
-    PREDICT_FRAMES = [PredictFrames(processed_frame_topic=PROCESSED_FRAME_TOPIC,
-                                    query_faces_topic=TARGET_FACE_TOPIC,
-                                    scale=1,
-                                    rr_distribute=ROUND_ROBIN) for _ in
-                      range(HM_PROCESSESS)]
-
-    for p in PREDICT_FRAMES:
-        p.start()
-
-    for c in CONSUME_FRAMES:
-        c.start()
-
-    for c in CONSUME_FRAMES:
-        c.join()
-
-    for p in PREDICT_FRAMES:
-        p.join()

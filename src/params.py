@@ -2,7 +2,7 @@
 
 import os
 
-file_dir = os.path.dirname(os.path.realpath(__file__))
+MAIN_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 """General Parameters"""
 # BROADCAST KNOWN FACE ENCODINGS OR PEOPLE TO FIND
@@ -20,11 +20,12 @@ PREDICTION_TOPIC_PREFIX = "{}_{}".format("predicted_object", FRAME_TOPIC)
 # USE RAW CV2 STREAMING or FAST BUT LESS FRAMES
 USE_RAW_CV2_STREAMING = False
 # TOPIC PARTITIONS
-SET_PARTITIONS = 320
+SET_PARTITIONS = 16
 # PARTITIONER
 ROUND_ROBIN = False
 
 """Demo Specific Parameters"""
+LOG_DIR = "logs"
 CLEAR_PRE_PROCESS_TOPICS = True
 # ENDPOINT FOR VIDEO STREAMS: URL WHERE VIDEOS ARE HOSTED
 C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
@@ -32,3 +33,5 @@ C_FRONT_ENDPOINT = "http://d3tj01z94i74qz.cloudfront.net/"
 CAMERAS = [0, 1, 2, 3, 4, 5]
 # TOTAL CAMERAS TO BE USED --> USED FOR FULL URL
 TOTAL_CAMERAS = len(CAMERAS)
+
+HM_PROCESSESS = SET_PARTITIONS // 8

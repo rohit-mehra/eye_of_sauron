@@ -2,9 +2,9 @@
 
 import time
 
-from frame_producer import StreamVideo
-from params import *
-from utils import clear_topic, set_topic, get_video_feed_url
+from src.frame_producer import StreamVideo
+from src.params import *
+from src.utils import clear_topic, set_topic, get_video_feed_url
 from web import app
 
 # Clear Broadcast topic, new query images to be used.
@@ -22,7 +22,7 @@ set_topic(FRAME_TOPIC, SET_PARTITIONS)
 # set partitions for processed frame topic
 set_topic(PROCESSED_FRAME_TOPIC, SET_PARTITIONS)
 # Wait
-time.sleep(3)
+time.sleep(5)
 
 """--------------STREAMING--------------"""
 # GET IPs OF CAMERAS, you can have your own function to get urls of video streams

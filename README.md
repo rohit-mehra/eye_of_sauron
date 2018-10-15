@@ -16,12 +16,12 @@
 
 <p align="center">
   <a href="#-key-features">Key Features</a> •
-  <a href="#️-stream-processing-pipeline">Stream Processing Pipeline</a> •
-  <a href="#️-how-to-use">How To Use</a> •
-  <a href="#️-configuration">Configuration</a> •
+  <a href="#-stream-processing-pipeline">Stream Processing Pipeline</a> •
+  <a href="#-how-to-use">How To Use</a> •
+  <a href="#-configuration">Configuration</a> •
   <a href="#-examples">Examples</a> •
   <a href="#-credits">Credits</a> •
-  <a href="#️-contact">Contact</a>
+  <a href="#-contact">Contact</a>
 
 </p>
 
@@ -29,9 +29,12 @@
 
 ## 🎨 Key Features
 
--   Scalable - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node. The producers and consumers are designed as python processes, as subclass of [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)
--   Stream Processing in Python - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala.
--   Modular approach - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
+-   **Scalable** - Get desired Frame Rate over multiple cameras, by just spinning more consumer nodes or more consumer processes in the same node. The producers and consumers are designed as python processes, as subclass of [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)
+
+
+-   **Stream Processing in Python** - This app essentially processes the stream of frames in python from the "raw frames" topic and publishes them into "predicted frames topic". Kafka [Stream API](https://kafka.apache.org/20/documentation/streams/) not yet available in Python, future work includes implementation of frame processing using stream api in scala. This system design can extend to other stream processing applications as well.
+
+-   **Modular approach** - Replace Face recognition model with desired Image processing model to detect entities as per your use case.
 
 ## 🔨 Stream Processing Pipeline
 
@@ -60,17 +63,23 @@ $ cd eye_of_sauron
 $ sudo pip3 install -r requirements.txt
 
 # Change permissions
-$ chmod +x run.py
+$ chmod +x run_producers.py
 
 # Run the app
-$ ./run.py
+$ ./run_producers.py
+
+or
+
+# Run the app
+$ python3 run_producers.py
 ```
 
 Note: If you're using Linux Bash you might need to convert run.py as
 
 ```bash
 $ sudo apt-get install dos2unix
-$ dos2unix run.py
+$ dos2unix run_producers.py
+$ dos2unix run_consumers.py
 ```
 
 2.  From your command line (For consumer nodes i.e. face recognition, or consumption of messages - frames from videos):
@@ -79,30 +88,27 @@ $ dos2unix run.py
 # Clone this repository
 $ git clone https://github.com/rrqq/eye_of_sauron.git
 
-# Go into the repository
-$ cd eye_of_sauron
-
 # Install dependencies
 $ sudo pip3 install -r requirements.txt
 
 # Run consumers
-$ python3 prediction_producer.py
+$ python3 run_consumers.py
 ```
 
 ## ⚙️ Configuration
 
-1.  [**params.py**](params.py)
+1.  [**params.py**](src/params.py)
 
     -   **SET_PARTITIONS** to set number of partitions for FRAME_TOPIC and PROCESSED_FRAME_TOPIC, this controls the level of parallelism. Rule of thumb when latency is a key factor, is to keep number of partitions to be less than [100 x b x r](https://www.confluent.io/blog/how-choose-number-topics-partitions-kafka-cluster) where b is the number of brokers in the cluster and r is the replication factor. Multi-partition is good for **fault-tolerance**, dealing with the **scaling (up or down)** and reassignment scenarios. If one (or more) of the consumer is stopped during the process, the assignor will take this into account and reassign the non-consumed partitions to valid consumers.
 
     -   **ROUND_ROBIN** set _True_ if you want to partition messages using [RoundRobinPartitioner](https://kafka-python.readthedocs.io/en/master/_modules/kafka/partitioner/roundrobin.html#RoundRobinPartitioner) else [Murmur2Partitioner](https://kafka-python.readthedocs.io/en/master/_modules/kafka/partitioner/hashed.html#Murmur2Partitioner)(Better option) will be used.
 
-2.  [**frame_producer.py**](frame_producer.py)
+2.  [**frame_producer.py**](src/frame_producer.py)
 
     -   **StreamVideo** class (inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)) is used to process videos from video_path and publish it to a specific topic, here FRAME_TOPIC.
 
 
-3.  [**prediction_producer.py**](prediction_producer.py)
+3.  [**prediction_producer.py**](src/prediction_producer.py)
 
     -   **ConsumeFrames** class (inherits [multiprocessing.Process](https://docs.python.org/3.5/library/multiprocessing.html#multiprocessing.Process)) consumes messages containing encoded frames, timestamped and keyed. Processes each frame (detects faces in the frame specifically their locations, and calculates face encodings) and pushes the result to PROCESSED_FRAME_TOPIC.
 
