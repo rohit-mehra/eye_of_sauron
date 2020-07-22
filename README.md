@@ -146,6 +146,6 @@ This software uses following open source packages.
 
 ## ✏️ Contact
 
-> [Linkedin](https://www.linkedin.com/in/rohitmehra-utsa/)  · 
-> GitHub [@rrqq](https://github.com/rrqq)  · 
+> [Linkedin](https://www.linkedin.com/in/mehra-rohit/)  · 
+> GitHub [@rrqq](https://github.com/rohit-mehra)  · 
 > Kaggle [@rrqqmm](https://www.kaggle.com/rrqqmm)
