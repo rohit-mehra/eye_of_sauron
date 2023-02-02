@@ -214,7 +214,7 @@ def clear_topic(topic=FRAME_TOPIC):
     """Util function to clear frame topic.
     :param topic: topic to delete.
     """
-    os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}".format(topic))
+    os.system("/usr/local/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic {}".format(topic))
 
 
 # E.
@@ -224,7 +224,7 @@ def set_topic(topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
     :param partitions: set partitions.
     """
     # SETTING UP TOPIC WITH DESIRED PARTITIONS
-    init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --zookeeper localhost:2181 " \
+    init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --bootstrap-server localhost:9092 " \
                "--replication-factor 3 --partitions {} --topic {}".format(partitions, topic)
 
     print("\n", init_cmd, "\n")
@@ -240,7 +240,7 @@ def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX):
     for i in range(TOTAL_CAMERAS + 1, 0, -1):
         print()
         # DELETE PREDICTION TOPICs, TO AVOID USING PREVIOUS JUNK DATA
-        os.system("/usr/local/kafka/bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic {}_{}".format(
+        os.system("/usr/local/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic {}_{}".format(
             prediction_prefix, i))
 
 
