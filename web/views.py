@@ -19,12 +19,12 @@ from web import app
 clear_prediction_topics()
 
 # Buffer properties
-BUFFER_SIZE = 600
+BUFFER_SIZE = 00
 BUFFER_DICT = defaultdict(list)
 DATA_DICT = defaultdict(dict)
 BUFFER_THREADS = dict()
 EVENT_THREADS = dict()
-THREADED_BUFFER_CONCEPT = True  # Use
+THREADED_BUFFER_CONCEPT = False  # Use
 
 # UPLOAD SETTINGS
 save_dir = os.getcwd() + "/data/faces"
