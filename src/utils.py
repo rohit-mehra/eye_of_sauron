@@ -103,7 +103,7 @@ def consume_buffer(cam_num, buffer_dict, data_dict, event_threads, lock, buffer_
     """
     # Print log
     print(
-        "\n[CAM {}][FLASK] Waiting for buffer to fill..[{}/{}]".format(cam_num, len(buffer_dict[cam_num]), buffer_size))
+            "\n[CAM {}][FLASK] Waiting for buffer to fill..[{}/{}]".format(cam_num, len(buffer_dict[cam_num]), buffer_size))
     event_threads[cam_num].wait()
 
     # Start consumption event as soon as the buffer hits the threshold.
@@ -214,7 +214,9 @@ def clear_topic(topic=FRAME_TOPIC):
     """Util function to clear frame topic.
     :param topic: topic to delete.
     """
-    os.system("/usr/local/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic {}".format(topic))
+    # init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic {}".format(topic)
+    init_cmd = f"confluent kafka topic delete {topic} --cluster lkc-qr5g3p"
+    os.system(init_cmd)
 
 
 # E.
@@ -224,8 +226,9 @@ def set_topic(topic=FRAME_TOPIC, partitions=SET_PARTITIONS):
     :param partitions: set partitions.
     """
     # SETTING UP TOPIC WITH DESIRED PARTITIONS
-    init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --bootstrap-server localhost:9092 " \
-               "--replication-factor 3 --partitions {} --topic {}".format(partitions, topic)
+    # init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --create --bootstrap-server localhost:9092 " \
+    #            "--replication-factor 3 --partitions {} --topic {}".format(partitions, topic)
+    init_cmd = f"confluent kafka topic create {topic} --cluster lkc-qr5g3p"
 
     print("\n", init_cmd, "\n")
     os.system(init_cmd)
@@ -240,8 +243,9 @@ def clear_prediction_topics(prediction_prefix=PREDICTION_TOPIC_PREFIX):
     for i in range(TOTAL_CAMERAS + 1, 0, -1):
         print()
         # DELETE PREDICTION TOPICs, TO AVOID USING PREVIOUS JUNK DATA
-        os.system("/usr/local/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic {}_{}".format(
-            prediction_prefix, i))
+        # init_cmd = "/usr/local/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --delete --topic {}_{}".format(prediction_prefix, i)
+        init_cmd = f"confluent kafka topic delete {prediction_prefix}_{i} --cluster lkc-qr5g3p"
+        os.system(init_cmd)
 
 
 # G. 1.
@@ -261,7 +265,7 @@ def np_from_json(obj, prefix_name=""):
     :param obj: numpy.ndarray"""
     return np.frombuffer(base64.b64decode(obj["{}_frame".format(prefix_name)].encode("utf-8")),
                          dtype=np.dtype(obj["{}_dtype".format(prefix_name)])).reshape(
-        obj["{}_shape".format(prefix_name)])
+            obj["{}_shape".format(prefix_name)])
 
 
 # H.

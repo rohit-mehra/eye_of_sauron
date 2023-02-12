@@ -2,6 +2,7 @@ import json
 import re
 import sys
 import time
+from configparser import ConfigParser
 from multiprocessing import Process
 
 import cv2
@@ -64,27 +65,30 @@ class StreamVideo(Process):
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         """
 
-        if self.rr_distribute:
-            partitioner = RoundRobinPartitioner(partitions=
-                                                [TopicPartition(topic=self.frame_topic, partition=i)
-                                                 for i in range(self.topic_partitions)])
-
-        else:
-
-            partitioner = Murmur2Partitioner(partitions=
-                                             [TopicPartition(topic=self.frame_topic, partition=i)
-                                              for i in range(self.topic_partitions)])
-
         # Producer object, set desired partitioner
-        frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
+        config_parser = ConfigParser()
+        # config_parser.read
+        config_parser.read("./kafka_config.ini", encoding='utf-8-sig')
+        config = dict(config_parser['default'])
+        bootstrap_servers = config['bootstrap.servers']
+        security_protocol = config['security.protocol']
+        sasl_mechanisms = config['sasl.mechanisms']
+        sasl_username = config['sasl.username']
+        sasl_password = config['sasl.password']
+        group_id = config['group.id']
+
+        frame_producer = KafkaProducer(bootstrap_servers=[bootstrap_servers],
                                        key_serializer=lambda key: str(key).encode(),
                                        value_serializer=lambda value: json.dumps(value).encode(),
-                                       partitioner=partitioner)
+                                       security_protocol=security_protocol,
+                                       sasl_mechanism=sasl_mechanisms,
+                                       sasl_plain_username=sasl_username,
+                                       sasl_plain_password=sasl_password)
 
         print("[CAM {}] URL: {}, SET PARTITIONS FOR FRAME TOPIC: {}".format(self.camera_num,
                                                                             self.video_path,
                                                                             frame_producer.partitions_for(
-                                                                                self.frame_topic)))
+                                                                                    self.frame_topic)))
         # Use either option
         video = cv2.VideoCapture(self.video_path) if self.use_cv2 else VideoStream(self.video_path).start()
 
