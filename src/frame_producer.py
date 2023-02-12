@@ -68,7 +68,7 @@ class StreamVideo(Process):
         # Producer object, set desired partitioner
         config_parser = ConfigParser()
         # config_parser.read
-        config_parser.read("./kafka_config.ini", encoding='utf-8-sig')
+        config_parser.read("./confluent_config.ini", encoding='utf-8-sig')
         config = dict(config_parser['default'])
         bootstrap_servers = config['bootstrap.servers']
         security_protocol = config['security.protocol']
