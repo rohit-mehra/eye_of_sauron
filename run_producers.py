@@ -28,7 +28,7 @@ from src.utils import clear_topic, set_topic, get_video_feed_url
 """--------------STREAMING--------------"""
 # GET IPs OF CAMERAS, you can have your own function to get urls of video streams
 CAMERA_URLS = [get_video_feed_url(i, folder="tracking") for i in CAMERAS]
-CAMERA_URLS = ["/home/lov/Desktop/eye_of_sauron/den_live.mp4", "/home/lov/Desktop/eye_of_sauron/tete.mp4"]
+CAMERA_URLS = ["./den_live.mp4", "./eye_of_sauron/tete.mp4"]
 
 # Init StreamVideo processes, these publish frames from respective camera to the same topic
 PRODUCERS = [StreamVideo(url, FRAME_TOPIC, SET_PARTITIONS,
