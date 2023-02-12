@@ -9,8 +9,8 @@ import cv2
 import imutils
 import numpy as np
 from imutils.video import VideoStream
-from kafka import KafkaProducer, TopicPartition
-from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
+from kafka import KafkaProducer
+# from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
 from .utils import np_to_json
 
 

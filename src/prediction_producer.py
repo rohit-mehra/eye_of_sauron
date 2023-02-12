@@ -5,12 +5,12 @@ from contextlib import contextmanager
 from multiprocessing import Process
 
 import cv2
-import face_recognition
+# import face_recognition
 import numpy as np
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.coordinator.assignors.range import RangePartitionAssignor
 from kafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
-from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
+# from kafka.partitioner import RoundRobinPartitioner, Murmur2Partitioner
 from kafka.structs import OffsetAndMetadata, TopicPartition
 
 from src.params import *
