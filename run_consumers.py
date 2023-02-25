@@ -16,8 +16,9 @@ CONSUME_FRAMES = [ConsumeFrames(frame_topic=FRAME_TOPIC,
                                 rr_distribute=ROUND_ROBIN) for _ in
                   range(HM_PROCESSESS)]
 
-for c in CONSUME_FRAMES:
-    c.start()
+if __name__ == "__main__":
+    for c in CONSUME_FRAMES:
+        c.start()
 
-for c in CONSUME_FRAMES:
-    c.join()
+    for c in CONSUME_FRAMES:
+        c.join()

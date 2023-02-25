@@ -136,7 +136,8 @@ class StreamVideo(Process):
                 print("\r[PRODUCER][Cam {}] FRAME: {} TO PARTITION: {}".format(message["camera"],
                                                                                frame_num, part), end="")
             # Publish to specific partition
-            frame_producer.send(self.frame_topic, key="{}_{}".format(self.camera_num, frame_num), value=message)
+            key = "{}_{}".format(self.camera_num, frame_num)
+            frame_producer.send(self.frame_topic, key=key, value=message)
 
             # if frame_num % 1000 == 0:
             frame_producer.flush()
@@ -166,7 +167,7 @@ class StreamVideo(Process):
         :return: A dict {"frame": string(base64encodedarray), "dtype": obj.dtype.str, "shape": obj.shape,
                     "timestamp": time.time(), "camera": camera, "frame_num": frame_num}
         """
-        frame = imutils.resize(frame, width=400)
+        # frame = imutils.resize(frame, width=640)
 
         if verbose:
             # print raw frame size

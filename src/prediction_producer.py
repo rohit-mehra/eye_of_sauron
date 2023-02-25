@@ -1,12 +1,14 @@
 import json
 import socket
 import time
+from configparser import ConfigParser
 from contextlib import contextmanager
 from multiprocessing import Process
 
 import cv2
 # import face_recognition
 import numpy as np
+from confluent_kafka import Consumer
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.coordinator.assignors.range import RangePartitionAssignor
 from kafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
@@ -15,6 +17,7 @@ from kafka.structs import OffsetAndMetadata, TopicPartition
 
 from src.params import *
 from src.utils import np_from_json, np_to_json
+from demo_yolo import *
 
 
 class ConsumeFrames(Process):
@@ -59,69 +62,62 @@ class ConsumeFrames(Process):
     def run(self):
         """Consume raw frames, detects faces, finds their encoding [PRE PROCESS],
            predictions Published to processed_frame_topic fro face matching."""
+        # Producer object, set desired partitioner
+        config_parser = ConfigParser()
+        # config_parser.read
+        config_parser.read("./confluent_config.ini", encoding='utf-8-sig')
+        config = dict(config_parser['default'])
+        bootstrap_servers = config['bootstrap.servers']
+        security_protocol = config['security.protocol']
+        sasl_mechanisms = config['sasl.mechanisms']
+        sasl_username = config['sasl.username']
+        sasl_password = config['sasl.password']
+        group_id = config['group.id']
 
-        # Connect to kafka, Consume frame obj bytes deserialize to json
-        partition_assignment_strategy = [RoundRobinPartitionAssignor] if self.rr_distribute else [
-                RangePartitionAssignor,
-                RoundRobinPartitionAssignor]
-
-        frame_consumer = KafkaConsumer(group_id="consume", client_id=self.iam,
-                                       bootstrap_servers=["0.0.0.0:9092"],
-                                       key_deserializer=lambda key: key.decode(),
-                                       value_deserializer=lambda value: json.loads(value.decode()),
-                                       partition_assignment_strategy=partition_assignment_strategy,
-                                       auto_offset_reset="earliest")
-
-        frame_consumer.subscribe([self.frame_topic])
-
-        # partitioner for processed frame topic
-        if self.rr_distribute:
-            partitioner = RoundRobinPartitioner(partitions=
-                                                [TopicPartition(topic=self.frame_topic, partition=i)
-                                                 for i in range(self.topic_partitions)])
-
-        else:
-
-            partitioner = Murmur2Partitioner(partitions=
-                                             [TopicPartition(topic=self.frame_topic, partition=i)
-                                              for i in range(self.topic_partitions)])
-        #  Produces prediction object
-        processed_frame_producer = KafkaProducer(bootstrap_servers=["localhost:9092"],
+        frame_consumer = Consumer(config)
+        processed_frame_producer = KafkaProducer(bootstrap_servers=[bootstrap_servers],
                                                  key_serializer=lambda key: str(key).encode(),
                                                  value_serializer=lambda value: json.dumps(value).encode(),
-                                                 partitioner=partitioner)
+                                                 security_protocol=security_protocol,
+                                                 sasl_mechanism=sasl_mechanisms,
+                                                 sasl_plain_username=sasl_username,
+                                                 sasl_plain_password=sasl_password)
 
+        load_model('./best_20_epochs_DataB.pt')
+
+        # Set up a callback to handle the '--reset' flag.
+        def reset_offset(consumer, partitions):
+            consumer.assign(partitions)
+
+        # Subscribe to topic
+        topic = "raw_frame_topic"
+        frame_consumer.subscribe([topic], on_assign=reset_offset)
+        # Poll for new messages from Kafka and print them.
         try:
             while True:
+                msg = frame_consumer.poll(1.0)
+                if msg is None:
+                    # Initial message consumption may take up to
+                    # `session.timeout.ms` for the consumer group to
+                    # rebalance and start consuming
+                    print("Waiting...")
+                elif msg.error():
+                    print("ERROR: %s".format(msg.error()))
+                else:
+                    # Get pre processing result
+                    decoded_value = json.loads(msg.value().decode())
+                    result = self.get_processed_frame_object(decoded_value, self.scale)
 
-                if self.verbose:
-                    print("[ConsumeFrames {}] WAITING FOR NEXT FRAMES..".format(socket.gethostname()))
+                    # Partition to be sent to
+                    prediction_topic = "processed_frame_topic"
 
-                raw_frame_messages = frame_consumer.poll(timeout_ms=10, max_records=10)
-
-                for topic_partition, msgs in raw_frame_messages.items():
-
-                    # Get the predicted Object, JSON with frame and meta info about the frame
-                    for msg in msgs:
-                        # get pre processing result
-                        result = self.get_processed_frame_object(msg.value, self.scale)
-
-                        tp = TopicPartition(msg.topic, msg.partition)
-                        offsets = {tp: OffsetAndMetadata(msg.offset, None)}
-                        frame_consumer.commit(offsets=offsets)
-
-                        # Partition to be sent to
-                        prediction_topic = "{}_{}".format(PREDICTION_TOPIC_PREFIX, result["camera"])
-                        processed_frame_producer.send(prediction_topic, key=result["frame_num"], value=result)
-
+                    key = "{}_{}".format(self.camera_num, result['frame_num'])
+                    processed_frame_producer.send(prediction_topic, key=key, value=result)
                     processed_frame_producer.flush()
-
-        except KeyboardInterrupt as e:
-            print(e)
+        except KeyboardInterrupt:
             pass
-
         finally:
-            print("Closing Stream")
+            # Leave group and commit final offsets
             frame_consumer.close()
 
     @staticmethod
@@ -135,33 +131,21 @@ class ConsumeFrames(Process):
 
         frame = np_from_json(frame_obj, prefix_name=ORIGINAL_PREFIX)  # frame_obj = json
         # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-        frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
-
-        # Yolo models
-        face_locations = face_recognition.face_locations(frame)
-
-        # Draw a box around the face
-        color = (0, 0, 255)  # blue
-
-        for (top, right, bottom, left) in face_locations:
-            cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+        # frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
 
         # TODO:
         # # Count people
-        prediction = 21
-        #
-        # # Draw count
-        # y, x, _ = frame.shape
-        # color_blue = (0, 0, 255)  # blue
-        # color_white = (255, 255, 255)  # blue
-        # frame = cv2.rectangle(frame, (x - 50, y - 30), (x - 1, y - 1), color_white, -1)
-        # frame = cv2.putText(frame, str(prediction), (x - 15, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color_blue, 1)
+        # prediction = 21
 
-        frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_BGR2RGB)
+        # # Draw count
+        frame, bboxes = predict(frame, view_img=True)
+
         frame_dict = np_to_json(frame, prefix_name=PREDICTED_PREFIX)
 
         # Add additional information
-        result = {"prediction": prediction,
+        num_people = len(bboxes)
+        result = {"num_people": num_people,
+                  "bboxes": bboxes,
                   "predict_time": str(time.time()),
                   "latency": str(time.time() - int(frame_obj["timestamp"]))}
 

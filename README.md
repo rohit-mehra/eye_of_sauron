@@ -61,7 +61,7 @@ $ git clone https://github.com/rrqq/eye_of_sauron.git
 $ cd eye_of_sauron
 
 # Install dependencies
-$ sudo pip3 install -r requirements.txt
+$ sudo pip3 install -r old_requirements.txt
 
 # Change permissions
 $ chmod +x run_producers.py
@@ -90,7 +90,7 @@ $ dos2unix run_consumers.py
 $ git clone https://github.com/rrqq/eye_of_sauron.git
 
 # Install dependencies
-$ sudo pip3 install -r requirements.txt
+$ sudo pip3 install -r old_requirements.txt
 
 # Run consumers
 $ python3 run_consumers.py
