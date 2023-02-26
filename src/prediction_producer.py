@@ -83,7 +83,7 @@ class ConsumeFrames(Process):
                                                  sasl_plain_username=sasl_username,
                                                  sasl_plain_password=sasl_password)
 
-        load_model('./best_20_epochs_DataB.pt')
+        load_model('best_20_epochs_DataB.pt')
 
         # Set up a callback to handle the '--reset' flag.
         def reset_offset(consumer, partitions):
