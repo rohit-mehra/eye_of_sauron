@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import warnings
+warnings.filterwarnings("ignore")
 from src.params import *
 from src.prediction_producer import ConsumeFrames
 

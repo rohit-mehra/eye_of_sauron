@@ -92,6 +92,8 @@ class ConsumeFrames(Process):
         # Subscribe to topic
         topic = "raw_frame_topic"
         frame_consumer.subscribe([topic], on_assign=reset_offset)
+
+        latencies = []
         # Poll for new messages from Kafka and print them.
         try:
             while True:
@@ -105,17 +107,30 @@ class ConsumeFrames(Process):
                     print("ERROR: %s".format(msg.error()))
                 else:
                     # Get pre processing result
-                    decoded_value = json.loads(msg.value().decode())
+                    decoded_key = msg.key().decode()
+                    camera_num = decoded_key.split('_')[0]
+
+                    decoded_value = json.loads(msg.value())
                     result = self.get_processed_frame_object(decoded_value, self.scale)
 
                     # Partition to be sent to
                     prediction_topic = "processed_frame_topic"
 
-                    key = "{}_{}".format(self.camera_num, result['frame_num'])
+                    key = "{}_{}".format(camera_num, result['frame_num'])
                     processed_frame_producer.send(prediction_topic, key=key, value=result)
                     processed_frame_producer.flush()
-        except KeyboardInterrupt:
-            pass
+
+                    # Print
+                    from datetime import datetime
+                    frame_datetime = datetime.fromtimestamp(result['timestamp'])
+                    print(f'Consumed frame at {frame_datetime}')
+
+                    # Print average latency
+                    latencies.append(float(result['latency']))
+                    print(f'Average latency: {sum(latencies)/len(latencies):.3f}s after {len(latencies)} frames')
+                    print('------------')
+        except:
+            frame_consumer.close()
         finally:
             # Leave group and commit final offsets
             frame_consumer.close()
@@ -152,7 +167,10 @@ class ConsumeFrames(Process):
         frame_obj.update(frame_dict)  # update frame with prediction
         result.update(frame_obj)  # add prediction results
 
-        return frame_obj
+        result.pop('original_frame', None)
+        result.pop('original_dtype', None)
+        result.pop('original_shape', None)
+        return result
 
 
 @contextmanager

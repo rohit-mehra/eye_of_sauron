@@ -11,8 +11,7 @@ from src.utils import get_video_feed_url
 """--------------STREAMING--------------"""
 # GET IPs OF CAMERAS, you can have your own function to get urls of video streams
 CAMERA_URLS = [get_video_feed_url(i, folder="tracking") for i in CAMERAS]
-# CAMERA_URLS = ["./den_live.mp4", "./den_live.mp4"]
-CAMERA_URLS = ["./embe.mp4", "./embe.mp4"]
+CAMERA_URLS = ["./demo_videos/demo_1.mp4"]
 
 # Init StreamVideo processes, these publish frames from respective camera to the same topic
 PRODUCERS = [StreamVideo(url, FRAME_TOPIC, SET_PARTITIONS,

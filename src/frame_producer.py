@@ -95,7 +95,7 @@ class StreamVideo(Process):
         # Track frame number
         frame_num = 0
         start_time = time.time()
-        print("[CAM {}] START TIME {}: ".format(self.camera_num, start_time))
+        print("START TIME {}: ".format(start_time))
 
         # Read URL, Transform, Publish
         while True:
@@ -106,9 +106,8 @@ class StreamVideo(Process):
                 # check if the file has read
                 if not success:
                     if self.verbose:
-                        print("[CAM {}] URL: {}, END FRAME: {}".format(self.name,
-                                                                       self.video_path,
-                                                                       frame_num))
+                        print("URL: {}, END FRAME: {}".format(self.video_path,
+                                                              frame_num))
                     break
 
             # using smart, only unique frames, skips frames, faster fps
@@ -117,9 +116,8 @@ class StreamVideo(Process):
                 # check if the file has read
                 if image is None:
                     if self.verbose:
-                        print("[CAM {}] URL: {}, END FRAME: {}".format(self.name,
-                                                                       self.video_path,
-                                                                       frame_num))
+                        print("URL: {}, END FRAME: {}".format(self.video_path,
+                                                              frame_num))
                     break
 
             # Attach metadata to frame, transform into JSON
@@ -133,8 +131,7 @@ class StreamVideo(Process):
             part = frame_num % self.topic_partitions
             # Logging
             if self.verbose:
-                print("\r[PRODUCER][Cam {}] FRAME: {} TO PARTITION: {}".format(message["camera"],
-                                                                               frame_num, part), end="")
+                print("\r[PRODUCER] FRAME: {}".format(frame_num), end="")
             # Publish to specific partition
             key = "{}_{}".format(self.camera_num, frame_num)
             frame_producer.send(self.frame_topic, key=key, value=message)
